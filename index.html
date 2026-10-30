@@ -259,7 +259,10 @@ function _flushPending(){
   if(_pendingSpeak){const fn=_pendingSpeak;_pendingSpeak=null;try{fn();}catch(e){}}
 }
 (function(){
-  const unlock=()=>{ if(_userGestured)return; _userGestured=true; _flushPending(); };
+  const unlock=()=>{ if(_userGestured)return; _userGestured=true; try{_getActx();}catch(e){} _flushPending(); };
+  const softUnlock=()=>{ try{_getActx();}catch(e){} };
+  document.addEventListener("touchstart",softUnlock,{once:false,passive:true});
+  document.addEventListener("mousedown",softUnlock,{once:false,passive:true});
   document.addEventListener("touchend",unlock,{once:false,passive:true});
   document.addEventListener("click",unlock,{once:false,passive:true});
   // 微信特殊通道：JSBridge 就绪即视为可播
@@ -323,15 +326,46 @@ function _playBaiduYoudao(text,rate,lang){
   return _playUrl("https://fanyi.baidu.com/gettts?lan="+lan+"&spd="+(lang==="zh"?4:3)+"&source=web&text="+encodeURIComponent(text),rate)
   .catch(()=>{ if(lan==="en")return _playUrl("https://dict.youdao.com/dictvoice?le=en&q="+encodeURIComponent(text),rate); throw new Error("no zh fallback"); });
 }
-function _playUrl(url,rate){
+/* 音频上下文：微信 XWeb 里 WebAudio 播放比 Audio 元素稳得多 */
+let _actx=null;
+function _getActx(){
+  if(!_actx){try{_actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}
+  if(_actx&&_actx.state==="suspended"){try{_actx.resume();}catch(e){}}
+  return _actx;
+}
+function _decodePlay(buf,rate){
   return new Promise((res,rej)=>{
-    const a=new Audio();
-    a.playbackRate=rate?Math.min(1.5,Math.max(0.6,rate+0.15)):1;
-    a.onended=()=>{_canAutoplay=true;res();};a.onerror=()=>{_canAutoplay=false;rej();};
-    a.src=url;
-    a.play().then(()=>{}).catch(()=>{_canAutoplay=false;rej();});
+    const ctx=_getActx();
+    if(!ctx)return rej(new Error("webaudio-no"));
+    ctx.decodeAudioData(buf,b=>{
+      try{
+        const src=ctx.createBufferSource();
+        src.buffer=b;
+        src.playbackRate.value=rate?Math.min(1.5,Math.max(0.6,rate+0.15)):1;
+        src.connect(ctx.destination);
+        src.onended=()=>{_canAutoplay=true;res();};
+        src.start();
+      }catch(e){rej(e);}
+    },err=>rej(new Error("decode-fail")));
     setTimeout(()=>rej(new Error("timeout")),12000);
   });
+}
+function _playUrl(url,rate){
+  /* 路径1：fetch→WebAudio（微信最稳）；路径2：Audio 元素兜底。错误带类型不再吞 */
+  const doFetch=()=>fetch(url,{mode:"cors",cache:"force-cache"}).then(r=>{
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    return r.arrayBuffer();
+  }).then(buf=>_decodePlay(buf,rate));
+  const doAudio=()=>new Promise((res,rej)=>{
+    const a=new Audio();
+    a.playbackRate=rate?Math.min(1.5,Math.max(0.6,rate+0.15)):1;
+    a.onended=()=>{_canAutoplay=true;res();};
+    a.onerror=e=>{_canAutoplay=false;const er=e&&e.target&&e.target.error;rej(new Error(er?("audio-err"+er.code):"audio-error"));};
+    a.src=url;
+    a.play().then(()=>{}).catch(err=>{_canAutoplay=false;rej(new Error((err&&err.name)||"play-rejected"));});
+    setTimeout(()=>rej(new Error("timeout")),12000);
+  });
+  return doFetch().catch(()=>doAudio());
 }
 function speakOnline(text,rate,quiet,lang){
   text=String(text).replace(/\s+/g," ").trim().slice(0,200);
@@ -344,8 +378,12 @@ function speakOnline(text,rate,quiet,lang){
     ()=>_playUrl("https://fanyi.baidu.com/gettts?lan="+lan+"&spd=3&source=web&text="+encodeURIComponent(text),rate),
     ()=>{ if(lan!=="en")throw new Error("skip"); return _playUrl("https://dict.youdao.com/dictvoice?le=en&q="+encodeURIComponent(text),rate); }
   ];
-  return tries.reduce((p,f)=>p.catch(f),Promise.reject())
-  .catch(e=>{ if(!quiet)notice("语音播放失败（"+String(e&&e.message||e)+"）。点右上角 ⚙️ 设置 → 🔊语音诊断 看详情"); throw e; });
+  const run=()=>tries.reduce((p,f)=>p.catch(f),Promise.reject());
+  return run().catch(e1=>run().catch(e=>{
+    const err=(e&&e.message&&e.message!=="timeout")?e:e1;
+    if(!quiet)notice("语音播放失败（"+String(err&&err.message||err)+"）。点右上角 ⚙️ 设置 → 🔊语音诊断 看详情");
+    throw err;
+  }));
 }
 /* 麦克风诊断：测权限/采集，报告环境能力 */
 async function micDiag(){
@@ -390,6 +428,7 @@ function edgeTTS(text,rate,voice){
       try{ws=new WebSocket("wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken="+TRUSTED+"&Sec-MS-GEC="+gec+"&Sec-MS-GEC-Version=1-131.0.2903.99");}
       catch(e){reject(e);return;}
       ws.binaryType="arraybuffer";
+      ws.binaryType="arraybuffer";
       const chunks=[];let timer=setTimeout(()=>{try{ws.close();}catch(e){}reject(new Error("edge timeout"));},15000);
       ws.onopen=()=>{
         const id=(Date.now().toString(16)+Math.random().toString(16).slice(2)).replace(/[^a-f0-9]/g,"").slice(0,32).padEnd(32,"0");
@@ -408,6 +447,7 @@ function edgeTTS(text,rate,voice){
         }
       };
       ws.onerror=()=>{clearTimeout(timer);reject(new Error("edge error"));};
+      ws.onclose=ev=>{ if(ev&&ev.code&&!chunks.length&&timer){} };
     }).catch(reject);
   });
 }
