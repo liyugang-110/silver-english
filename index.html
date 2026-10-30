@@ -1299,9 +1299,11 @@ function openSettings(){
 function setGender(g){state.gender=g;$("gF").classList.toggle("org",g!=="m");$("gM").classList.toggle("org",g==="m");}
 function setRate(r){state.rate=r;document.querySelectorAll(".rate-btn").forEach(b=>b.classList.toggle("on",b.dataset.rate===r));save();speak("Hello! Nice to meet you!");}
 function saveSettings(){
-  state.nick=$("nickInput").value.trim().charAt(0)||state.nick;
+  /* 允许清空：输入框空则存空串（下次进入会重新出现欢迎引导） */
+  state.nick=$("nickInput").value.trim().charAt(0)||"";
   state.key=$("keyInput").value.trim();
   save();$("settingsModal").style.display="none";renderHome();
+  if(!state.nick)toast("已清除称呼。下次进入将重新引导您设置");
 }
 
 /* ================= 启动 ================= */
