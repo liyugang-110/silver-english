@@ -571,7 +571,7 @@ function welMicUp(){
   stopStream();
   if(!chunks.length){$("welResult").textContent="没听到声音，再按住说一次吧 🎤";return;}
   $("welResult").textContent="正在听懂您的话…";
-  iatRecognize(chunks,sr,"zh").then(t=>{
+  recognizeAny(chunks,sr,"zh").then(t=>{
     welHandleText(t);
   }).catch(e=>{
     $("welResult").textContent="没听清，您可以在下面手动填姓氏 👇";
@@ -908,8 +908,12 @@ function repeatGo(btn,target){
         const proc=ctx.createScriptProcessor(4096,1,1);
         proc.onaudioprocess=e=>chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
         src.connect(proc);proc.connect(ctx.destination);
+        /* MediaRecorder 双保险 */
+        let mr=null;
+        try{mr=new MediaRecorder(stream);window._mrChunks=[];mr.ondataavailable=e=>{if(e.data&&e.data.size)window._mrChunks.push(e.data);};mr.start(300);}catch(e){window._mrChunks=null;}
         setTimeout(()=>{
           try{proc.disconnect();src.disconnect();}catch(e){}
+          try{if(mr&&mr.state!=="inactive")mr.stop();}catch(e){}
           stream.getTracks().forEach(t=>t.stop());
           try{ctx.close();}catch(e){}
           resolve({chunks,sr:ctx.sampleRate});
@@ -918,7 +922,7 @@ function repeatGo(btn,target){
     });
   }).then(({chunks,sr})=>{
     res.textContent="正在听懂您的话…";
-    return iatRecognize(chunks,sr,chatMode()?"zh":"en");
+    return recognizeAny(chunks,sr,chatMode()?"zh":"en");
   }).then(heard=>{
     const score=compareSay(target,heard);
     res.style.display="block";
@@ -1053,7 +1057,7 @@ function micUp(){
   stopIat();
   if(!chunks.length){toast("没听到声音，请再按住说一次 🎤");return;}
   $("thinking").style.display="block";
-  iatRecognize(chunks,sr,chatMode()?"zh":"en").then(t=>{
+  recognizeAny(chunks,sr,chatMode()?"zh":"en").then(t=>{
     $("thinking").style.display="none";
     showConfirm(t);
   }).catch(e=>{
@@ -1076,9 +1080,18 @@ async function iatDown(){
     const src=_iac.createMediaStreamSource(_recStream);
     const proc=_iac.createScriptProcessor(4096,1,1);
     const chunks=[];
-    proc.onaudioprocess=e=>{if(_holding)chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));};
+    window._spGotData=false;
+    proc.onaudioprocess=e=>{if(_holding){chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));window._spGotData=true;}};
     src.connect(proc);proc.connect(_iac.destination);
     window._iatProc=proc;window._iatSrc=src;window._iatChunks=chunks;
+    /* 双通道保险：MediaRecorder 同步录（部分内核 ScriptProcessor 不产数据） */
+    try{
+      const mr=new MediaRecorder(_recStream);
+      window._mrChunks=[];
+      mr.ondataavailable=e=>{if(e.data&&e.data.size)window._mrChunks.push(e.data);};
+      mr.start(300);
+      window._mr=mr;
+    }catch(e){window._mr=null;window._mrChunks=null;}
   }catch(e){
     toast("打开麦克风失败了。\n\n解决办法：\n① 允许本页面使用麦克风\n② 或用下面的输入框，点一下用键盘上的 🎤 语音");
     micReset();
@@ -1087,6 +1100,7 @@ async function iatDown(){
 function stopStream(){
   try{window._iatProc&&window._iatProc.disconnect();}catch(e){}
   try{window._iatSrc&&window._iatSrc.disconnect();}catch(e){}
+  try{if(window._mr&&window._mr.state!=="inactive")window._mr.stop();}catch(e){}
   try{_recStream&&_recStream.getTracks().forEach(t=>t.stop());}catch(e){}
   try{_iac&&_iac.close();}catch(e){}
   _recStream=null;_iac=null;
@@ -1099,6 +1113,19 @@ function micReset(){$("micBtn").classList.remove("holding");$("micBtn").textCont
 function micCancel(){
   if(SR&&_rec){try{_rec.onresult=null;_rec.onend=null;_rec.stop();}catch(e){}_rec=null;}
   stopIat();_holding=false;micReset();
+}
+/* 统一识别入口：老接口无数据时自动换 MediaRecorder 录音解码 */
+async function recognizeAny(chunks,sr,lang){
+  let c=chunks,rate=sr;
+  const total=c.reduce((a,x)=>a+x.length,0);
+  if(total<rate*0.3&&window._mrChunks&&window._mrChunks.length){
+    const blob=new Blob(window._mrChunks,{type:window._mrChunks[0].type||"audio/webm"});
+    const ab=await blob.arrayBuffer();
+    const ctx=_getActx()||new (window.AudioContext||window.webkitAudioContext)();
+    const ab2=await new Promise((res,rej)=>{try{ctx.decodeAudioData(ab.slice(0),res,rej);}catch(e){rej(e);}});
+    c=[ab2.getChannelData(0)];rate=ab2.sampleRate;
+  }
+  return iatRecognize(c,rate,lang);
 }
 function iatRecognize(chunks,sr,lang){
   return new Promise((resolve,reject)=>{
