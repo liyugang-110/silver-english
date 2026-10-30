@@ -240,11 +240,13 @@ const WELCOME_B64=[
 /* 内置欢迎语音：本地必定可播 */
 function playBuiltIn(){
   /* 双保险：Audio 播 data URI（同源无网络，兼容性最强）→ WebAudio 解码 */
+  const my=++_audioSeq;_stopAllAudio();
   return new Promise((res,rej)=>{
     try{
       const a=new Audio("data:audio/mpeg;base64,"+WELCOME_B64);
       window._welAudio=a;
-      a.onended=()=>{_canAutoplay=true;res();};
+      const guard=r=>()=>{if(my===_audioSeq)r();};
+      a.onended=guard(()=>{_canAutoplay=true;res();});
       a.onerror=()=>rej(new Error("builtin-audio-fail"));
       a.play().catch(()=>rej(new Error("builtin-rejected")));
       setTimeout(()=>rej(new Error("builtin-timeout")),15000);
@@ -370,11 +372,19 @@ function speakCn(text){
   return run();
 }
 /* 统一朗读链路：Edge神经(最自然) → 浏览器引擎 → 百度 → 有道(仅英语) */
+let _audioSeq=0; /* 播放互斥锁：保证任意时刻只有一个声源 */
+function _stopAllAudio(){
+  try{speechSynthesis&&speechSynthesis.cancel();}catch(e){}
+  try{if(window._welAudio&&!window._welAudio.paused){window._welAudio.pause();}}catch(e){}
+}
 function speakAny(text,rate,lang,quiet){
+  const my=++_audioSeq;_stopAllAudio();
+  const ok=res=>()=>{if(my===_audioSeq)res();};
   return edgeTTS(text,rate,lang==="zh"?"zh-CN-XiaoxiaoNeural":"en-US-AvaNeural")
-  .then(u=>_playUrl(u,rate))
+  .then(u=>new Promise((res,rej)=>{_playUrl(u,rate).then(ok(res),rej);}))
   .catch(()=>{
-    const synth=(res)=>{
+    if(my!==_audioSeq)return Promise.resolve();
+    return new Promise(res=>{
       if(_canUseTTS()){
         try{
           speechSynthesis.cancel();
@@ -385,15 +395,14 @@ function speakAny(text,rate,lang,quiet){
             ?(vs.find(v=>/zh[-_]CN/i.test(v.lang)&&/female|xiaoxiao|huihui|ting/i.test(v.name))||vs.find(v=>/^zh/i.test(v.lang)))
             :(vs.find(v=>/en[-_]US/i.test(v.lang)&&/female|samantha|zira|aria|jenny/i.test(v.name))||vs.find(v=>/^en/i.test(v.lang)));
           if(v)u.voice=v;
-          u.onend=()=>{_canAutoplay=true;res();};
-          u.onerror=()=>{_ttsBroken=true;_playBaiduYoudao(text,rate,lang).then(res,res);};
+          u.onend=ok(res);
+          u.onerror=()=>{if(my===_audioSeq)_playBaiduYoudao(text,rate,lang).then(ok(res),res);else res();};
           speechSynthesis.speak(u);
           return;
         }catch(e){}
       }
-      _playBaiduYoudao(text,rate,lang).then(res,res);
-    };
-    return new Promise(synth).catch(e=>{ if(!quiet)notice("语音播放失败：点一下屏幕任意位置，再点 🔊 重试"); throw e; });
+      if(my===_audioSeq)_playBaiduYoudao(text,rate,lang).then(ok(res),res);else res();
+    }).catch(e=>{ if(!quiet)notice("语音播放失败：点一下屏幕任意位置，再点 🔊 重试"); throw e; });
   });
 }
 function _playBaiduYoudao(text,rate,lang){
@@ -612,7 +621,11 @@ function welMicDown(){
       rec.onerror=e=>{
         const er=e.error||"";
         if(er==="not-allowed"||er==="service-not-allowed"){_srBroken=true;$("welResult").textContent="麦克风没允许：请在弹窗点“允许”后重试";}
-        else if(er==="no-speech"){$("welResult").textContent="没听到声音：请凑近一点、大声说“我姓李” 🎤";}
+        else if(er==="no-speech"){
+          _welNS=(_welNS||0)+1;
+          if(_welNS>=2){_srBroken=true;$("welResult").textContent="这台手机的网页语音识别不好使，手动填最方便 👇（要在微信里用语音，得等开通识别服务）";}
+          else $("welResult").textContent="没听到声音：请凑近一点、大声说“我姓李” 🎤";
+        }
         else if(er==="network"){$("welResult").textContent="识别服务连不上（手机网络原因），请用下面手动填 👇";}
         else if(er!=="aborted"){$("welResult").textContent="识别没成功（"+er+"），请再试一次或手动填 👇";}
       };
