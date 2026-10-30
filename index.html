@@ -184,8 +184,13 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
       <button class="mini-btn" style="flex:1;padding:10px;" onclick="micDiag()">🎤 麦克风诊断</button>
     </div>
     <details style="margin-top:12px;"><summary style="font-size:14px;color:var(--muted);">高级：填写自己的 AI 密钥</summary>
-      <input id="keyInput" type="password" placeholder="DeepSeek API Key（选填）" style="width:100%;border:2px solid var(--line);border-radius:12px;padding:10px;font-size:14px;margin-top:8px;">
-      <div style="font-size:12px;color:var(--muted);margin-top:4px;">不填也能用。如果您有自己旧版「english-agent」的密钥，会自动带过来。</div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+        <button class="mini-btn pf-btn" data-pf="zhipu" style="padding:8px 10px;" onclick="setPlatform('zhipu')">智谱GLM（免费✨推荐）</button>
+        <button class="mini-btn pf-btn" data-pf="spark" style="padding:8px 10px;" onclick="setPlatform('spark')">讯飞星火（免费）</button>
+        <button class="mini-btn pf-btn" data-pf="deepseek" style="padding:8px 10px;" onclick="setPlatform('deepseek')">DeepSeek（付费）</button>
+      </div>
+      <input id="keyInput" type="password" placeholder="粘贴 API 密钥（选填）" style="width:100%;border:2px solid var(--line);border-radius:12px;padding:10px;font-size:14px;margin-top:8px;">
+      <div id="pfHint" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
     </details>
   </div>
 </div>
@@ -238,12 +243,13 @@ const state={
   gender:localStorage.getItem("se_gender")||"",
   rate:localStorage.getItem("se_rate")||"mid",
   key:localStorage.getItem("se_key")||(localStorage.getItem("anna_key")||""), // 自动继承旧版密钥
+  platform:localStorage.getItem("se_platform")||"zhipu", // zhipu=智谱GLM(免费) deepseek=DeepSeek(付费) spark=讯飞星火(免费)
   xfAppid:"ff8487eb",
   xfKey:"a072aa918cf53af7e2bc23f242d351f5",
   xfSecret:atob("TmpKbVpUUmxZbVkxTm1Ka1pERm1ORGcxTWpoalpqTmo="),
   history:[],current:null,busy:false
 };
-function save(){localStorage.setItem("se_nick",state.nick);localStorage.setItem("se_gender",state.gender);localStorage.setItem("se_rate",state.rate);localStorage.setItem("se_key",state.key);}
+function save(){localStorage.setItem("se_nick",state.nick);localStorage.setItem("se_gender",state.gender);localStorage.setItem("se_rate",state.rate);localStorage.setItem("se_key",state.key);localStorage.setItem("se_platform",state.platform);}
 function curRate(){return RATES[state.rate]||0.7;}
 
 /* ================= 朗读（复用多链路：浏览器→百度→有道→Edge神经） ================= */
@@ -869,25 +875,30 @@ Reply in EXACTLY this 4-part format, plain text, no markdown:
 🎓 跟我读: <先一句中文引导，再用 || 分隔 2-3 个要跟读的小段，每段格式固定：英文|中文|中文谐音。每段不超过 6 个单词。谐音用中文字模拟发音，如 hop in → 哈普·因。没有谐音和中文是不合格的>
 Rules: never scold; if learner makes a mistake, say the better way gently in 💡 as "更地道的说法". Be encouraging like a kind old friend. After 5-7 good turns congratulate and say this scene is completed. Always output all 4 parts.`;
   const key=(state.key||"").trim();
+  const EP=state.platform==="deepseek"
+    ?["https://api.deepseek.com/chat/completions","deepseek-chat"]
+    :state.platform==="spark"
+    ?["https://spark-api-open.xf-yun.com/v1/chat/completions","generalv3.5"]
+    :["https://open.bigmodel.cn/api/paas/v4/chat/completions","glm-4-flash"];
   let reply=null;
   if(key){
     try{
-      const res=await fetch("https://api.deepseek.com/chat/completions",{
+      const res=await fetch(EP[0],{
         method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-        body:JSON.stringify({model:"deepseek-chat",messages:[{role:"system",content:sys},...state.history.slice(-12)],temperature:0.6,max_tokens:1500})
+        body:JSON.stringify({model:EP[1],messages:[{role:"system",content:sys},...state.history.slice(-12)],temperature:0.6,max_tokens:1500})
       });
       if(res.ok){
         reply=((await res.json()).choices[0].message.content||"").trim();
         if(!reply){
-          const r2=await fetch("https://api.deepseek.com/chat/completions",{
+          const r2=await fetch(EP[0],{
             method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-            body:JSON.stringify({model:"deepseek-chat",messages:[{role:"system",content:sys+"\nIMPORTANT: output the 4-part reply directly."},...state.history.slice(-12)],temperature:0.6,max_tokens:1500})
+            body:JSON.stringify({model:EP[1],messages:[{role:"system",content:sys+"\nIMPORTANT: output the 4-part reply directly."},...state.history.slice(-12)],temperature:0.6,max_tokens:1500})
           });
           if(r2.ok)reply=((await r2.json()).choices[0].message.content||"").trim();
         }
       }else{
         let msg="";try{const e=await res.json();msg=e.message||"";}catch(e){}
-        reply="【老师解答】连接 AI 失败了（"+(res.status===401?"密钥无效":res.status===402?"余额不足":"网络错误")+"）。您可以先点上面的常用句练习，或在设置里检查密钥。";
+        reply="【老师解答】连接 AI 失败了（"+(res.status===401?"密钥无效":res.status===402?"余额不足":"网络错误("+res.status+")")+"）。您可以先点上面的常用句练习，或在设置里检查密钥。";
       }
     }catch(e){reply=null;}
   }
@@ -1117,6 +1128,14 @@ function fallbackCopy(done){
 }
 
 /* ================= 设置 ================= */
+function setPlatform(pf){state.platform=pf;save();pfSync();}
+function pfSync(){
+  document.querySelectorAll(".pf-btn").forEach(b=>b.style.outline=b.dataset.pf===state.platform?"3px solid #f59e0b":"");
+  const hints={zhipu:"✨ 推荐：打开 open.bigmodel.cn 注册 → 控制台右上角「API Keys」→ 复制粘贴到上面。永久免费，不用绑卡。",
+    spark:"讯飞开放平台 spark-api-open.xf-yun.com 申请 APIPassword 即可，免费不限量（限速2次/秒）。",
+    deepseek:"platform.deepseek.com 充值后使用，效果更好但需付费。"};
+  $("pfHint").textContent=hints[state.platform]||"";
+}
 function openSettings(){
   $("nickInput").value=state.nick;
   $("keyInput").value=state.key;
