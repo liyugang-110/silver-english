@@ -96,6 +96,10 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
   </div>
   <div class="sec-title">🗓️ 我的坚持</div>
   <div id="calRow"></div>
+  <div class="sec-title">💬 想聊天？Anna 随时都在</div>
+  <button class="big-btn" onclick="startChat({id:'chat',title:'陪您聊聊天',emoji:'💬',goal:'',chat:true})" style="width:100%;border:2px dashed #f59e0b;background:#fffbeb;">
+    <span class="em">☕</span><span>和 Anna 聊聊天<small>说中文就行，她还能教您两句英语</small></span>
+  </button>
   <div class="sec-title">🎯 情景练一练（点一个开始）</div>
   <div id="sceneList"></div>
   <div style="height:14px"></div>
@@ -265,52 +269,49 @@ function notice(msg){
 function speak(text,rate,quiet){
   text=(text||"").trim(); if(!text)return Promise.resolve();
   const r=rate||curRate();
-  const run=()=>_speakNow(text,r,quiet);
+  const run=()=>speakAny(text,r,"en",quiet);
   if(!_userGestured&&!quiet){ _pendingSpeak=run; return Promise.resolve(); }
   return run();
-}
-function _speakNow(text,r,quiet){
-  if(_canUseTTS()){
-    return new Promise((res,rej)=>{
-      try{
-        speechSynthesis.cancel();
-        const u=new SpeechSynthesisUtterance(text);
-        u.lang="en-US";u.rate=r;
-        const vs=speechSynthesis.getVoices();
-        const v=vs.find(v=>/en[-_]US/i.test(v.lang)&&/female|samantha|zira|aria|jenny/i.test(v.name))||vs.find(v=>/^en/i.test(v.lang));
-        if(v)u.voice=v;
-        u.onend=()=>{_canAutoplay=true;res();};
-        u.onerror=()=>{_ttsBroken=true;_canAutoplay=false;speakOnline(text,r,quiet).then(res,rej);};
-        speechSynthesis.speak(u);
-      }catch(e){ speakOnline(text,r,quiet).then(res,rej); }
-    });
-  }
-  return speakOnline(text,r,quiet);
 }
 /* 中文朗读（问称呼、打招呼用） */
 function speakCn(text){
   text=(text||"").trim(); if(!text)return Promise.resolve();
-  const run=()=>{
-    if(_canUseTTS()){
-      return new Promise(res=>{
+  const run=()=>speakAny(text,1,"zh",true);
+  if(!_userGestured){ _pendingSpeak=run; return Promise.resolve(); }
+  return run();
+}
+/* 统一朗读链路：Edge神经(最自然) → 浏览器引擎 → 百度 → 有道(仅英语) */
+function speakAny(text,rate,lang,quiet){
+  return edgeTTS(text,rate,lang==="zh"?"zh-CN-XiaoxiaoNeural":"en-US-AvaNeural")
+  .then(u=>_playUrl(u,rate))
+  .catch(()=>{
+    const synth=(res)=>{
+      if(_canUseTTS()){
         try{
           speechSynthesis.cancel();
           const u=new SpeechSynthesisUtterance(text);
-          u.lang="zh-CN";u.rate=0.95;
+          u.lang=lang==="zh"?"zh-CN":"en-US";u.rate=lang==="zh"?0.95:rate;
           const vs=speechSynthesis.getVoices();
-          const v=vs.find(v=>/zh[-_]CN/i.test(v.lang)&&/female|xiaoxiao|huihui|ting/i.test(v.name))||vs.find(v=>/^zh/i.test(v.lang));
+          const v=lang==="zh"
+            ?(vs.find(v=>/zh[-_]CN/i.test(v.lang)&&/female|xiaoxiao|huihui|ting/i.test(v.name))||vs.find(v=>/^zh/i.test(v.lang)))
+            :(vs.find(v=>/en[-_]US/i.test(v.lang)&&/female|samantha|zira|aria|jenny/i.test(v.name))||vs.find(v=>/^en/i.test(v.lang)));
           if(v)u.voice=v;
-          u.onend=()=>res();u.onerror=()=>{speakOnline(text,1,true,"zh").catch(()=>{});res();};
+          u.onend=()=>{_canAutoplay=true;res();};
+          u.onerror=()=>{_ttsBroken=true;_playBaiduYoudao(text,rate,lang).then(res,res);};
           speechSynthesis.speak(u);
           return;
         }catch(e){}
-        speakOnline(text,1,true,"zh").catch(()=>{}).then(()=>res());
-      });
-    }
-    return speakOnline(text,1,true,"zh").catch(()=>{});
-  };
-  if(!_userGestured){ _pendingSpeak=()=>{run();}; return Promise.resolve(); }
-  return run();
+      }
+      _playBaiduYoudao(text,rate,lang).then(res,res);
+    };
+    return new Promise(synth).catch(e=>{ if(!quiet)notice("语音播放失败：点一下屏幕任意位置，再点 🔊 重试"); throw e; });
+  });
+}
+function _playBaiduYoudao(text,rate,lang){
+  text=String(text).replace(/\s+/g," ").trim().slice(0,200);
+  const lan=lang==="zh"?"zh":"en";
+  return _playUrl("https://fanyi.baidu.com/gettts?lan="+lan+"&spd="+(lang==="zh"?4:3)+"&source=web&text="+encodeURIComponent(text),rate)
+  .catch(()=>{ if(lan==="en")return _playUrl("https://dict.youdao.com/dictvoice?le=en&q="+encodeURIComponent(text),rate); throw new Error("no zh fallback"); });
 }
 function _playUrl(url,rate){
   return new Promise((res,rej)=>{
@@ -346,7 +347,7 @@ function edgeTTS(text,rate,voice){
       ws.binaryType="arraybuffer";
       const chunks=[];let timer=setTimeout(()=>{try{ws.close();}catch(e){}reject(new Error("edge timeout"));},15000);
       ws.onopen=()=>{
-        const id=crypto.randomUUID().replace(/-/g,"");
+        const id=(Date.now().toString(16)+Math.random().toString(16).slice(2)).replace(/[^a-f0-9]/g,"").slice(0,32).padEnd(32,"0");
         const date=new Date().toString();
         ws.send(`X-Timestamp:${date}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`);
         const ratePct=rate&&rate<1?"-"+Math.round((1-rate)*100)+"%":"+0%";
@@ -424,7 +425,6 @@ function pitchGenderF32(chunks,sr){
 }
 /* 欢迎层逻辑 */
 function welHello(){
-  _userGestured=true;
   speakCn("您好啊！我是您的英语老师，我叫 Anna。我应该怎么称呼您呢？请按住下面的按钮，告诉我您姓什么。比如：我姓李。");
   $("welStep2").classList.remove("hidden");
   $("welResult").textContent="";
@@ -497,6 +497,14 @@ function toastName(xing){
   b.addEventListener("mouseup",e=>{e.preventDefault();welMicUp();});
 })();
 
+/* ===== 陪伴感工具：随机挑一句，避免每次都一样 ===== */
+function chatMode(){return !!(state.current&&state.current.chat);}
+function micLang(){return chatMode()?"zh-cn":"en-US";}
+function pickRnd(arr){return arr[Math.floor(Math.random()*arr.length)];}
+const PRAISE=[`今天学得真棒！我给您记着呢，明天我还在这儿等您。`,`说得越来越有模有样了！明天咱们继续，不见不散。`,`今天到这里就好，学语言要细水长流。您休息，我明天等您。`,`真不错！我就喜欢陪您这样一天一点地进步。明天见！`];
+const REP_GOOD=["🌸 说得真棒！就照这个感觉继续！","👏 太好了，您这发音我给满分的感觉！","✨ 好听！再来一句就更顺了。","🎉 不错不错，您越来越敢说了！"];
+const REP_NEAR=["👍 很接近了！点 🐢 慢速再听一遍，跟着读，然后再试一次。您刚才说的是：","😊 就差一点点！先听我读一遍，再大声说一次。您刚才说的是："];
+const REP_MISS=["💪 没关系，谁都有开头难的时候。先点 🔊 听，再点 🐢 慢速跟着读两遍，然后点 🎤 再试。","🌿 不着急，慢慢来。先听 🔊，再听 🐢 慢速，跟着哼一遍，准备好再按 🎤。"];
 /* ================= 首页渲染 ================= */
 function hashDay(){const s=todayStr();let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h;}
 function renderHome(){
@@ -505,12 +513,27 @@ function renderHome(){
   const hi=who?`${who}，`:"";
   const greet=hour<11?`${hi}早上好！☀️ 学 3 句，2 分钟就好`:(hour<18?`${hi}下午好！☀️ 学 3 句，2 分钟就好`:`${hi}晚上好！🌙 学 3 句，2 分钟就好`);
   $("greetLine").textContent=greet;
-  // 每天第一次进入：Anna 中文语音问候（营造陪伴感）
+  // ===== 陪伴感：像真人一样的问候（记得上次见面、打卡天数、语气随机变化） =====
   const today=todayStr();
   if(who&&localStorage.getItem("se_greeted")!==today){
     localStorage.setItem("se_greeted",today);
-    setTimeout(()=>{ speakCn(`${who}${hour<11?"早上好":"您好"}！我是Anna，想您啦。今天还是三句话，不着急，慢慢来。`); },600);
+    const last=localStorage.getItem("se_lastVisit")||"";
+    let gap=0;
+    if(last&&last!==today){
+      const d1=new Date(last.replace(/-/g,"/")),d2=new Date(today.replace(/-/g,"/"));
+      gap=Math.round((d2-d1)/86400000);
+    }
+    let n=0;try{n=Object.keys(JSON.parse(localStorage.getItem("se_check")||"{}")).length;}catch(e){}
+    const hourTxt=hour<11?"早上好":(hour<18?"下午好":"晚上好");
+    let line;
+    if(!last){ line=`${who}${hourTxt}！我是Anna。从今天起我就是您的英语伙伴啦，每天两分钟，咱们慢慢来。`; }
+    else if(gap<=1){ line=pickRnd([`${who}${hourTxt}！今天也来啦，真自觉，我喜欢您这股劲儿。`,`${who}${hourTxt}！又见面啦，我正在等您呢。今天还是三句话，不着急，慢慢来。`,`${who}${hourTxt}！连续来学，您比我认识的很多人都坚持得好。`]); }
+    else if(gap<=3){ line=`${who}${hourTxt}！${gap}天没见，可想您了。没关系，咱们接着学，就当昨天歇了个假。`; }
+    else{ line=`${who}${hourTxt}！好些天没见您了，我一直在这儿等您呢。咱们从头劲儿再来，不着急。`; }
+    if(n>=3&&gap<=1)line+=`您已经坚持${n}天了，给自己鼓个掌！👏`;
+    setTimeout(()=>speakCn(line),700);
   }
+  localStorage.setItem("se_lastVisit",today);
   // 今日 3 句
   const pool=[];SCENES.forEach(s=>s.sentences.forEach(t=>pool.push({scene:s,t})));
   const h=hashDay();
@@ -527,7 +550,9 @@ function renderHome(){
       <div class="hy">🗣️ 谐音：${escapeHtml(p.t[2])}</div>
       <div class="ipa" id="tipa${i}"></div>
       <div class="btns"><button class="mini-btn" onclick="speak('${safe}',0.55)">🐢 慢速</button>
-      <button class="mini-btn" onclick="speak('${safe}')">▶️ 正常</button></div>`;
+      <button class="mini-btn" onclick="speak('${safe}')">▶️ 正常</button>
+      <button class="mini-btn org" onclick="repeatGo(this,'${safe}')">🎤 跟读</button></div>
+      <div class="rep-result" style="font-size:15px;margin-top:6px;display:none;"></div>`;
     list.appendChild(d);
     setTimeout(()=>{getIpaPhrase(p.t[0]).then(ipa=>{const el=$("tipa"+i);if(el&&ipa)el.textContent="/"+ipa+"/";});},120);
   });
@@ -564,6 +589,8 @@ function finishToday(){
   checks[todayStr()]=1;localStorage.setItem("se_check",JSON.stringify(checks));
   renderCal();
   $("doneToday").disabled=true;$("doneToday").textContent="🌸 打卡成功！真棒！";
+  let n=0;try{n=Object.keys(checks).length;}catch(e){}
+  setTimeout(()=>speakCn(`${nameTitle()}，${pickRnd(PRAISE)}${n>=2?`这已经是第${n}个卡啦！`:""}`),400);
   showShareCard();
 }
 
@@ -585,7 +612,7 @@ function startChat(s){
   $("msgs").innerHTML="";const th=document.createElement("div");th.id="thinking";th.style.display="none";th.textContent="…Anna 正在打字";$("msgs").appendChild(th);
   // 快捷句
   const qr=$("quickRow");qr.innerHTML="";
-  s.quick.forEach(q=>{
+  (s.quick||[]).forEach(q=>{
     const b=document.createElement("button");b.textContent=q[0]+" "+q[1];
     b.onclick=()=>{addMsg("user",q[0],q[1]);sendToAnna(q[0]);};
     qr.appendChild(b);
@@ -595,6 +622,14 @@ function startChat(s){
 }
 function addOpening(s){
   const box=$("msgs");
+  if(s.chat){ /* 陪伴聊天模式：Anna 先开口 */
+    const who=nameTitle()||"";
+    const d=document.createElement("div");d.className="msg ai";
+    d.innerHTML=`<span class="cn">☕ ${escapeHtml(who?who+"，":"")}我在呢！想聊点什么？家里的事、高兴的事、烦心的事，随便说说都行。不会打字就按住下面的话筒说吧 🎤</span>`;
+    box.appendChild(d);box.scrollTop=box.scrollHeight;
+    setTimeout(()=>speakCn((who?who+"，":"")+"我在呢！想聊点什么？随便说说都行。"),400);
+    return;
+  }
   const d=document.createElement("div");d.className="msg ai";
   const situa=`（${s.title}。对方是不懂中文的外国人，他先开口了——您听懂后回应他）`;
   const gEn=s.open[0],gCn=s.open[1],rEn=s.open[2],rCn=s.open[3];
@@ -692,10 +727,12 @@ function attachDrill(el,raw){
       <div class="dcn">🇨🇳 ${escapeHtml(p.cn||"（意思见上面）")}</div>
       ${p.hy?`<div class="dhy">🗣️ 谐音：${escapeHtml(p.hy)}</div>`:""}
       <div class="dipa"></div>
-      <div class="btns" style="display:flex;gap:8px;margin-top:4px;">
+      <div class="btns" style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;">
         <button class="mini-btn" onclick="speak('${safe}',0.55)">🐢 慢速</button>
         <button class="mini-btn" onclick="speak('${safe}')">▶️ 正常</button>
-      </div>`;
+        <button class="mini-btn org" onclick="repeatGo(this,'${safe}')">🎤 跟读</button>
+      </div>
+      <div class="rep-result" style="font-size:15px;margin-top:6px;display:none;"></div>`;
     bar.appendChild(row);
     setTimeout(()=>{getIpaPhrase(p.en).then(ipa=>{const ip=row.querySelector(".dipa");if(ip&&ipa)ip.textContent="/"+ipa+"/";});},150);
   });
@@ -705,6 +742,67 @@ function attachDrill(el,raw){
   else if(typeof box!=="undefined"&&box){box.scrollTop=box.scrollHeight;}
 }
 
+/* ================= 跟读（自动录音→识别→鼓励式比对） ================= */
+let _repBusy=false;
+function normEn(s){return String(s||"").toLowerCase().replace(/[^a-z0-9' ]/g," ").split(/\s+/).filter(Boolean);}
+function compareSay(target,heard){
+  const T=normEn(target),H=normEn(heard);
+  if(!T.length||!H.length)return 0;
+  let hit=0;
+  T.forEach(w=>{
+    if(H.indexOf(w)>-1){hit++;return;}
+    if(w.length>3&&H.some(h=>h.slice(0,4)===w.slice(0,4)))hit+=0.5; // 半对：近音词
+  });
+  return Math.round(hit/T.length*100);
+}
+function repeatGo(btn,target){
+  if(_repBusy){notice("正在听您读呢，稍等一下～");return;}
+  _repBusy=true;
+  const row=btn.parentElement.parentElement;
+  const res=row.querySelector(".rep-result");
+  res.style.display="block";res.style.color="var(--muted)";
+  btn.disabled=true;const oldTxt=btn.textContent;btn.textContent="🔴 正在录音…请大声跟读";
+  speak(target,null,true).then(()=>{
+    res.textContent="轮到您啦！大声读出来：";
+    return new Promise(r=>setTimeout(r,400));
+  }).then(()=>{
+    // 录 4.5 秒
+    return navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}}).then(stream=>{
+      return new Promise((resolve,reject)=>{
+        const ctx=new (window.AudioContext||window.webkitAudioContext)();
+        const src=ctx.createMediaStreamSource(stream);
+        const chunks=[];
+        const proc=ctx.createScriptProcessor(4096,1,1);
+        proc.onaudioprocess=e=>chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+        src.connect(proc);proc.connect(ctx.destination);
+        setTimeout(()=>{
+          try{proc.disconnect();src.disconnect();}catch(e){}
+          stream.getTracks().forEach(t=>t.stop());
+          try{ctx.close();}catch(e){}
+          resolve({chunks,sr:ctx.sampleRate});
+        },4500);
+      });
+    });
+  }).then(({chunks,sr})=>{
+    res.textContent="正在听懂您的话…";
+    return iatRecognize(chunks,sr,chatMode()?"zh":"en");
+  }).then(heard=>{
+    const score=compareSay(target,heard);
+    res.style.display="block";
+    if(score>=60){res.style.color="var(--green)";res.innerHTML=pickRnd(REP_GOOD);if(Math.random()<0.4)speakCn(pickRnd(["好！就这样！","不错哟！","说得挺好！"]));}
+    else if(score>=30){res.style.color="#b45309";res.innerHTML=pickRnd(REP_NEAR)+escapeHtml(heard);}
+    else{res.style.color="var(--muted)";res.innerHTML=pickRnd(REP_MISS);}
+  }).catch(e=>{
+    res.style.display="block";res.style.color="var(--muted)";
+    const em=String(e&&e.message||e);
+    res.textContent=em.indexOf("麦克风")>-1||em.indexOf("permission")>-1||em.indexOf("NotAllowed")>-1
+      ?"🎤 麦克风没打开：请在手机弹窗里点“允许”，然后重试"
+      :"没听清您读的，再来一次吧！（第一次用会弹出麦克风权限，请点允许）";
+  }).finally(()=>{
+    _repBusy=false;btn.disabled=false;btn.textContent="🎤 跟读";
+  });
+}
+
 /* ================= AI ================= */
 async function sendToAnna(userText){
   if(state.busy)return;
@@ -712,7 +810,11 @@ async function sendToAnna(userText){
   $("thinking").style.display="block";$("msgs").scrollTop=$("msgs").scrollHeight;
   state.history.push({role:"user",content:userText});
   const s=state.current;
-  const sys=`You are Anna, a warm, patient English tutor for a Chinese senior beginner (55+). Current scene: "${s.title}". Goal: ${s.goal}. You play the foreigner who ONLY speaks English. The learner is the Chinese host/service person. Speak slowly, very simple English (CEFR A1).
+  const chatMode=!!s.chat;
+  const who=nameTitle()||"您";
+  const sys=chatMode
+    ?`你是 Anna，一位温柔贴心的中文 AI 老伙伴，正在和${who}（55岁以上的中国长辈）闲聊陪伴。说话像老朋友：口语化、温暖，多用"哎、呀、呢"；每次只说 2-3 句话，绝不长篇大论；主动关心身体和家人；对方提到往事要多问一句细节（比如"后来呢？"）；聊到吃饭、天气、孙子孙女等话题时，可以顺带教一句相关的简单英语（一句即可，格式如：对了，"多吃点"用英语说是 Eat more，读作"伊特·莫"，您跟着念念？），但别硬教；对方情绪低落时先安慰，别讲道理。直接输出要说的话，纯文本。`
+    :`You are Anna, a warm, patient English tutor for a Chinese senior beginner (55+). Current scene: "${s.title}". Goal: ${s.goal}. You play the foreigner who ONLY speaks English. The learner is the Chinese host/service person. Speak slowly, very simple English (CEFR A1).
 The learner already saw this opening: the foreigner said "${s.open[0]}" (${s.open[1]}). Remember it; never contradict or re-ask info already given.
 Reply in EXACTLY this 4-part format, plain text, no markdown:
 <In-character English reply, max 2 very short sentences, then one tiny question. If the learner asks for help in Chinese, this part is instead a direct Chinese answer from the teacher prefixed 【老师解答】>
@@ -743,10 +845,18 @@ Rules: never scold; if learner makes a mistake, say the better way gently in �
       }
     }catch(e){reply=null;}
   }
-  if(!reply)reply=demoReply();
+  if(!reply)reply=chatMode?demoChatReply():demoReply();
   state.history.push({role:"assistant",content:reply});
-  addAiMsg(reply);
+  if(chatMode){
+    const b=addMsg("ai","","");
+    b.innerHTML=`<span class="cn">${escapeHtml(reply)}</span>`;
+    $("msgs").scrollTop=$("msgs").scrollHeight;
+    speakCn(reply.replace(/[「」""“”]/g,"").slice(0,130));
+  }else addAiMsg(reply);
   state.busy=false;
+}
+function demoChatReply(){
+  return pickRnd([`哎，听您这么说我也高兴！后来呢，再给我讲讲？`,`是呀，家里人好才是真的好。您最近睡得踏实吗？`,`可不是嘛！对了，您知道"喝杯茶"用英语怎么说吗？Have a cup of tea，读作"哈夫·厄·卡普·奥夫·提"，您跟我念念？`,`您说得对，慢慢来，身体最要紧。今天吃了什么好吃的呀？`,`哈哈哈，您真有意思！我喜欢听您讲这些。您孙子孙女最近怎么样呀？`]);
 }
 function demoReply(){
   const turn=state.history.filter(h=>h.role==="user").length;
@@ -775,14 +885,14 @@ function micDown(){
   // 优先浏览器原生识别（识别快、自动断句）
   if(SR){
     try{
-      _rec=new SR();_rec.lang="en-US";_rec.interimResults=false;_rec.maxAlternatives=1;
+      _rec=new SR();_rec.lang=micLang();_rec.interimResults=false;_rec.maxAlternatives=1;
       _rec.onresult=e=>{const t=e.results[0][0].transcript;showConfirm(t);};
       _rec.onerror=e=>{
         _rec=null;
         if(e.error==="no-speech")toast("没听到声音，再试一次吧 🎤");
         else toast("语音识别暂时用不了（"+e.error+"）。\n\n可以改用下面的输入框：点一下，用键盘上的 🎤 语音输入");
       };
-      _rec.onend=()=>{if(_holding){_holding=false;$("micBtn").classList.remove("holding");$("micBtn").textContent="🎤 按住说话（说英语）";}};
+      _rec.onend=()=>{if(_holding){_holding=false;micReset();}};
       _rec.start();_recStart=Date.now();
       return;
     }catch(e){/* 掉到 IAT */}
@@ -792,7 +902,7 @@ function micDown(){
 let _recBroken=false;
 function micUp(){
   if(!_holding)return;_holding=false;
-  $("micBtn").classList.remove("holding");$("micBtn").textContent="🎤 按住说话（说英语）";
+  micReset();
   const held=Date.now()-_recStart;
   if(SR&&_rec){ setTimeout(()=>{try{_rec&&_rec.stop();}catch(e){}},held<700?700-held:0); return; }
   stopIat();
@@ -828,7 +938,7 @@ function stopIat(){
   if(_iatWs){try{_iatWs.close();}catch(e){}_iatWs=null;}
   stopStream();
 }
-function micReset(){$("micBtn").classList.remove("holding");$("micBtn").textContent="🎤 按住说话（说英语）";}
+function micReset(){$("micBtn").classList.remove("holding");$("micBtn").textContent=chatMode()?"🎤 按住说话（说中文）":"🎤 按住说话（说英语）";}
 function micCancel(){
   if(SR&&_rec){try{_rec.onresult=null;_rec.onend=null;_rec.stop();}catch(e){}_rec=null;}
   stopIat();_holding=false;micReset();
@@ -962,6 +1072,8 @@ function saveSettings(){
 renderHome();
 if(!state.nick){
   $("welcomeModal").style.display="flex";
+  // 自动播欢迎语：微信里 JSBridge 就绪即播；其他浏览器在用户首次触摸后播
+  setTimeout(welHello,800);
 }
 </script>
 </body>
