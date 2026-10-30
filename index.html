@@ -570,6 +570,7 @@ function pitchGenderF32(chunks,sr){
 }
 /* 欢迎层逻辑 */
 function welHello(){
+  try{speechSynthesis.cancel();}catch(e){}
   $("welStep2").classList.remove("hidden");
   $("welResult").textContent="";
   playBuiltIn().catch(()=>speakCn("您好啊！我是您的英语老师，我叫 Anna。我应该怎么称呼您呢？请按住下面的按钮，告诉我您姓什么。比如：我姓李。"));
@@ -587,7 +588,13 @@ function welMicDown(){
       const rec=new SR();rec.lang="zh-CN";rec.interimResults=false;rec.maxAlternatives=1;
       _wrec=rec;
       rec.onresult=e=>{welHandleText(e.results[0][0].transcript);};
-      rec.onerror=e=>{const er=e.error||"";if(er==="not-allowed"||er==="service-not-allowed")_srBroken=true;};
+      rec.onerror=e=>{
+        const er=e.error||"";
+        if(er==="not-allowed"||er==="service-not-allowed"){_srBroken=true;$("welResult").textContent="麦克风没允许：请在弹窗点“允许”后重试";}
+        else if(er==="no-speech"){$("welResult").textContent="没听到声音：请凑近一点、大声说“我姓李” 🎤";}
+        else if(er==="network"){$("welResult").textContent="识别服务连不上（手机网络原因），请用下面手动填 👇";}
+        else if(er!=="aborted"){$("welResult").textContent="识别没成功（"+er+"），请再试一次或手动填 👇";}
+      };
       rec.onend=()=>{_wrec=null;};
       rec.start();
       return;
@@ -599,7 +606,7 @@ function welMicDown(){
 function welMicUp(){
   if(!_welHolding)return;_welHolding=false;_holding=false;
   $("welMic").classList.remove("holding");$("welMic").textContent="🎤 按住说话（说中文）";
-  if(_wrec){const r=_wrec;_wrec=null;setTimeout(()=>{try{r.stop();}catch(e){}},400);return;}
+  if(_wrec){const r=_wrec;_wrec=null;$("welResult").textContent="正在听懂您的话…";setTimeout(()=>{try{r.stop();}catch(e){}},400);return;}
   const chunks=(window._iatChunks||[]).slice();
   const sr=_iac?_iac.sampleRate:16000;
   stopStream();
@@ -675,7 +682,8 @@ function renderHome(){
   $("greetLine").textContent=greet;
   // ===== 陪伴感：像真人一样的问候（记得上次见面、打卡天数、语气随机变化） =====
   const today=todayStr();
-  if(who&&localStorage.getItem("se_greeted")!==today){
+  const welOpen=$("welcomeModal")&&$("welcomeModal").style.display==="flex";
+  if(who&&!welOpen&&localStorage.getItem("se_greeted")!==today){
     localStorage.setItem("se_greeted",today);
     const last=localStorage.getItem("se_lastVisit")||"";
     let gap=0;
