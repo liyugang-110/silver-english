@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1.4,user-scalable=yes">
 <title>小银英语 · 跟AI外教轻松开口</title>
+<meta name="theme-color" content="#e0553a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="小银英语">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%23e0553a'/%3E%3Ctext x='96' y='128' font-size='96' font-weight='bold' text-anchor='middle' fill='%23fff' font-family='sans-serif'%3E英%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%23e0553a'/%3E%3Ctext x='96' y='128' font-size='96' font-weight='bold' text-anchor='middle' fill='%23fff' font-family='sans-serif'%3E英%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href='data:application/manifest+json,{"name":"小银英语","short_name":"小银英语","start_url":"./","display":"standalone","background_color":"%23f6f7fb","theme_color":"%23e0553a","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 192 192%27%3E%3Crect width=%27192%27 height=%27192%27 fill=%27%23e0553a%27/%3E%3Ctext x=%2796%27 y=%27130%27 font-size=%27100%27 font-weight=%27bold%27 text-anchor=%27middle%27 fill=%27%23fff%27%3E英%3C/text%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml","purpose":"any"}]}'>
 <style>
 :root{--bg:#f6f7fb;--card:#fff;--text:#1e293b;--muted:#64748b;--primary:#e0553a;--primary-dark:#c9402a;--green:#15803d;--line:#e2e8f0;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -149,17 +156,13 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
     <div style="font-size:52px;">👵🧓</div>
     <h3 style="font-size:24px;color:var(--primary);margin-top:8px;">您好啊！👋</h3>
     <div style="font-size:19px;line-height:1.7;margin-top:8px;">我是您的英语老师 <b>Anna</b>。<br>我应该怎么称呼您呢？</div>
-    <div style="font-size:13px;color:var(--muted);text-align:center;margin:6px 0 10px;">🔊 Anna 正在说话…没有声音？点一下屏幕任意位置，或点右上角「···」→「在浏览器打开」</div>
+    <div style="font-size:13px;color:var(--muted);text-align:center;margin:6px 0 10px;">🔊 Anna 正在说话…没有声音？点一下屏幕任意位置</div>
     <div id="welStep2" class="hidden">
-      <div style="font-size:18px;margin:12px 0 6px;">按住下面的按钮，告诉我：<br><b>“我姓李”“我姓王”</b> 就可以啦</div>
-      <button id="welMic" style="width:100%;border:none;border-radius:16px;padding:20px;font-size:20px;font-weight:700;background:var(--primary);color:#fff;">🎤 按住说话（说中文）</button>
-      <div id="welResult" style="font-size:17px;margin-top:10px;color:var(--muted);"></div>
+      <div style="font-size:18px;margin:12px 0 10px;">在下面输入框，<b>打字</b>告诉我您的姓，<br>或用键盘上的 🎤 <b>语音输入</b>说“我姓李”</div>
+      <input id="welInput" placeholder="您的姓氏，如：李" style="width:100%;border:2px solid var(--line);border-radius:12px;padding:14px;font-size:20px;text-align:center;" autocomplete="off">
     </div>
-    <div style="margin-top:16px;border-top:2px dashed var(--line);padding-top:14px;">
-      <div style="font-size:15px;color:var(--muted);">不方便说话？手动填：</div>
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <input id="welInput" placeholder="您的姓氏，如：李" style="flex:1;border:2px solid var(--line);border-radius:12px;padding:10px;font-size:18px;">
-      </div>
+    <div id="welResult" style="font-size:17px;margin-top:10px;color:var(--muted);"></div>
+    <div style="margin-top:16px;">
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="mini-btn" style="flex:1;" onclick="welManual('f')">👩 我是女的（称阿姨）</button>
         <button class="mini-btn" style="flex:1;" onclick="welManual('m')">👨 我是男的（称叔叔）</button>
@@ -604,70 +607,14 @@ function welHello(){
     _pendingSpeak=()=>playBuiltIn().catch(()=>{});
   });
 }
-/* 欢迎层按住说话（中文） */
-let _welHolding=false;
-let _wrec=null;
-function welMicDown(){
-  if(_welHolding)return;_welHolding=true;
-  /* 关键：先把正在播的语音全停掉，释放音频通道给麦克风 */
-  try{speechSynthesis.cancel();}catch(e){}
-  _pendingSpeak=null;
-  try{if(window._welAudio&&!window._welAudio.paused){window._welAudio.pause();window._welAudio.currentTime=0;}}catch(e){}
-  $("welMic").classList.add("holding");$("welMic").textContent="🔴 正在听…请说“我姓李”";
-  $("welResult").textContent="听您说呢…";
-  /* 首选浏览器原生识别 */
-  if(SR&&!_srBroken){
-    try{
-      const rec=new SR();rec.lang="zh-CN";rec.interimResults=false;rec.maxAlternatives=1;
-      _wrec=rec;
-      rec.onresult=e=>{welHandleText(e.results[0][0].transcript);};
-      rec.onerror=e=>{
-        const er=e.error||"";
-        if(er==="not-allowed"||er==="service-not-allowed"){_srBroken=true;$("welResult").textContent="麦克风没允许：请在弹窗点“允许”后重试";}
-        else if(er==="no-speech"){
-          _welNS=(_welNS||0)+1;
-          if(_welNS>=2){_srBroken=true;$("welResult").textContent="这台手机的网页语音识别不好使，手动填最方便 👇（要在微信里用语音，得等开通识别服务）";}
-          else $("welResult").textContent="没听到声音：请凑近一点、大声说“我姓李” 🎤";
-        }
-        else if(er==="network"){$("welResult").textContent="识别服务连不上（手机网络原因），请用下面手动填 👇";}
-        else if(er!=="aborted"){$("welResult").textContent="识别没成功（"+er+"），请再试一次或手动填 👇";}
-      };
-      rec.onend=()=>{_wrec=null;};
-      rec.start();
-      return;
-    }catch(e){_srBroken=true;_wrec=null;}
-  }
-  _holding=true;_recStart=Date.now();
-  iatDown();
-}
-function welMicUp(){
-  if(!_welHolding)return;_welHolding=false;_holding=false;
-  $("welMic").classList.remove("holding");$("welMic").textContent="🎤 按住说话（说中文）";
-  if(_wrec){const r=_wrec;_wrec=null;$("welResult").textContent="正在听懂您的话…";setTimeout(()=>{try{r.stop();}catch(e){}},400);stopStream();return;}
-  const chunks=(window._iatChunks||[]).slice();
-  const sr=_iac?_iac.sampleRate:16000;
-  stopStream();
-  if(!chunks.length){$("welResult").textContent="没听到声音，再按住说一次吧 🎤";return;}
-  $("welResult").textContent="正在听懂您的话…";
-  recognizeAny(chunks,sr,"zh").then(t=>{
-    welHandleText(t);
-  }).catch(e=>{
-    $("welResult").textContent="没听清，您可以在下面手动填姓氏 👇";
-  });
-}
-function welHandleText(t){
-  t=(t||"").trim();
-  let xing="";
-  const m=t.match(/(?:我姓|姓|叫|我是|免贵姓)([\u4e00-\u9fa5a-zA-Z]{1,3})/);
-  if(m)xing=m[1].charAt(0);
-  else{const c=t.replace(/^我(姓|叫|是)?|^姓|^叫我/,"").match(/[\u4e00-\u9fa5]/);if(c)xing=c[0];}
-  if(xing&&"我您他她姓叫是".includes(xing))xing=""; /* 防止把"我"这类字当姓 */
-  if(!xing){$("welResult").textContent="没听清您的姓，再按住说一次，或在下面手动填 👇";return;}
-  const g=pitchGenderF32(window._iatChunks,_iac?_iac.sampleRate:16000);
-  finishWelcome(xing,g,t);
-}
+/* 欢迎页麦克风事件：已改为输入框直接填写（可用键盘语音输入），不再提供按住说话 */
 function welManual(g){
-  const x=$("welInput").value.trim().charAt(0);
+  let x=$("welInput").value.trim().charAt(0);
+  /* 与语音同样净化：剥掉"我/叫/姓"前缀和常用字黑名单，防把"我叔叔"当姓 */
+  if(x&&"我您他她姓叫是".includes(x)){
+    const c=$("welInput").value.trim().replace(/^我(姓|叫|是)?|^姓|^叫我/,"").match(/[\u4e00-\u9fa5]/);
+    x=c?c[0]:"";
+  }
   if(!x){alert("请先填一下您的姓氏，比如：李");return;}
   finishWelcome(x,g,"");
 }
@@ -692,15 +639,7 @@ function toastName(xing){
   document.body.appendChild(t);
   setTimeout(()=>{if(t.parentElement)t.remove();},6000);
 }
-/* 欢迎页麦克风事件 */
-(function(){
-  const b=$("welMic");
-  if(!b)return;
-  b.addEventListener("touchstart",e=>{e.preventDefault();welMicDown();},{passive:false});
-  b.addEventListener("touchend",e=>{e.preventDefault();welMicUp();},{passive:false});
-  b.addEventListener("mousedown",e=>{e.preventDefault();welMicDown();});
-  b.addEventListener("mouseup",e=>{e.preventDefault();welMicUp();});
-})();
+/* （欢迎页按住说话事件绑定已随按钮移除） */
 
 /* ===== 陪伴感工具：随机挑一句，避免每次都一样 ===== */
 function chatMode(){return !!(state.current&&state.current.chat);}
