@@ -557,15 +557,30 @@ function welHello(){
 }
 /* 欢迎层按住说话（中文） */
 let _welHolding=false;
+let _wrec=null;
 function welMicDown(){
-  if(_welHolding)return;_welHolding=true;_holding=true;_recStart=Date.now();
+  if(_welHolding)return;_welHolding=true;
   $("welMic").classList.add("holding");$("welMic").textContent="🔴 正在听…请说“我姓李”";
   $("welResult").textContent="听您说呢…";
+  /* 首选浏览器原生识别 */
+  if(SR&&!_srBroken){
+    try{
+      const rec=new SR();rec.lang="zh-CN";rec.interimResults=false;rec.maxAlternatives=1;
+      _wrec=rec;
+      rec.onresult=e=>{welHandleText(e.results[0][0].transcript);};
+      rec.onerror=e=>{if(e.error!=="aborted")_srBroken=true;};
+      rec.onend=()=>{_wrec=null;};
+      rec.start();
+      return;
+    }catch(e){_srBroken=true;_wrec=null;}
+  }
+  _holding=true;_recStart=Date.now();
   iatDown();
 }
 function welMicUp(){
   if(!_welHolding)return;_welHolding=false;_holding=false;
   $("welMic").classList.remove("holding");$("welMic").textContent="🎤 按住说话（说中文）";
+  if(_wrec){const r=_wrec;_wrec=null;setTimeout(()=>{try{r.stop();}catch(e){}},400);return;}
   const chunks=(window._iatChunks||[]).slice();
   const sr=_iac?_iac.sampleRate:16000;
   stopStream();
@@ -888,13 +903,45 @@ function compareSay(target,heard){
   });
   return Math.round(hit/T.length*100);
 }
+function _judgeRepeat(res,btn,target,heard){
+  const score=compareSay(target,heard||"");
+  res.style.display="block";
+  if(score>=60){res.style.color="var(--green)";res.innerHTML=pickRnd(REP_GOOD);if(Math.random()<0.4)speakCn(pickRnd(["好！就这样！","不错哟！","说得挺好！"]));}
+  else if(score>=30){res.style.color="#b45309";res.innerHTML=pickRnd(REP_NEAR)+escapeHtml(heard||"");}
+  else{res.style.color="var(--muted)";res.innerHTML=pickRnd(REP_MISS);}
+}
 function repeatGo(btn,target){
   if(_repBusy){notice("正在听您读呢，稍等一下～");return;}
-  _repBusy=true;
   const row=btn.parentElement.parentElement;
   const res=row.querySelector(".rep-result");
+  /* 首选：浏览器原生识别（快、自动断句），vivo/Chrome 等大多支持 */
+  if(SR&&!_srBroken){
+    try{
+      _repBusy=true;res.style.display="block";res.style.color="var(--muted)";
+      btn.disabled=true;btn.textContent="🔴 准备…先听一遍";
+      speak(target,null,true).then(()=>new Promise(r=>setTimeout(r,300))).then(()=>{
+        res.textContent="🎤 轮到您啦！大声跟读：";
+        btn.textContent="🔴 正在听…读完自动停";
+        const rec=new SR();rec.lang=chatMode()?"zh-CN":"en-US";rec.interimResults=false;rec.maxAlternatives=1;
+        _rec=rec;
+        rec.onresult=e=>{_judgeRepeat(res,btn,target,e.results[0][0].transcript);};
+        rec.onerror=e=>{
+          if(e.error==="not-allowed"){_srBroken=true;res.textContent="🎤 麦克风没允许，请在弹窗点允许后重试";}
+          else{_srBroken=true;res.textContent="原生识别不可用（"+e.error+"），正在换备用通道…";}
+        };
+        rec.onend=()=>{_rec=null;_repBusy=false;btn.disabled=false;btn.textContent="🎤 跟读";};
+        try{rec.start();}catch(e){_srBroken=true;_repBusy=false;btn.disabled=false;btn.textContent="🎤 跟读";return pcmRepeat(btn,target,res);}
+      });
+      return;
+    }catch(e){_srBroken=true;_repBusy=false;btn.disabled=false;btn.textContent="🎤 跟读";}
+  }
+  return pcmRepeat(btn,target,res);
+}
+function pcmRepeat(btn,target,res){
+  if(_repBusy){notice("正在听您读呢，稍等一下～");return;}
+  _repBusy=true;
   res.style.display="block";res.style.color="var(--muted)";
-  btn.disabled=true;const oldTxt=btn.textContent;btn.textContent="🔴 正在录音…请大声跟读";
+  btn.disabled=true;btn.textContent="🔴 正在录音…请大声跟读";
   speak(target,null,true).then(()=>{
     res.textContent="轮到您啦！大声读出来：";
     return new Promise(r=>setTimeout(r,400));
@@ -924,17 +971,14 @@ function repeatGo(btn,target){
     res.textContent="正在听懂您的话…";
     return recognizeAny(chunks,sr,chatMode()?"zh":"en");
   }).then(heard=>{
-    const score=compareSay(target,heard);
-    res.style.display="block";
-    if(score>=60){res.style.color="var(--green)";res.innerHTML=pickRnd(REP_GOOD);if(Math.random()<0.4)speakCn(pickRnd(["好！就这样！","不错哟！","说得挺好！"]));}
-    else if(score>=30){res.style.color="#b45309";res.innerHTML=pickRnd(REP_NEAR)+escapeHtml(heard);}
-    else{res.style.color="var(--muted)";res.innerHTML=pickRnd(REP_MISS);}
+    _judgeRepeat(res,btn,target,heard);
   }).catch(e=>{
     res.style.display="block";res.style.color="var(--muted)";
     const em=String(e&&e.message||e);
-    res.textContent=em.indexOf("麦克风")>-1||em.indexOf("permission")>-1||em.indexOf("NotAllowed")>-1
-      ?"🎤 麦克风没打开：请在手机弹窗里点“允许”，然后重试"
-      :"没听清您读的，再来一次吧！（第一次用会弹出麦克风权限，请点允许）";
+    if(em.indexOf("麦克风")>-1||em.indexOf("permission")>-1||em.indexOf("NotAllowed")>-1)res.textContent="🎤 麦克风没打开：请在手机弹窗里点“允许”，然后重试";
+    else if(em.indexOf("识别连接失败")>-1||em.indexOf("识别超时")>-1)res.textContent="语音识别服务连不上（"+em+"）。请检查网络后重试";
+    else if(em.indexOf("识别失败")>-1)res.textContent="识别服务返回错误（"+em+"）。请截图发开发者";
+    else res.textContent="没听清您读的，再来一次吧！要按住读完整个句子哦";
   }).finally(()=>{
     _repBusy=false;btn.disabled=false;btn.textContent="🎤 跟读";
   });
@@ -1022,7 +1066,7 @@ function sendText(){
 }
 
 /* ================= 按住说话（讯飞 IAT 听写 + 浏览器SR兜底） ================= */
-let _rec=null,_recStream=null,_recChunks=[],_recStart=0,_holding=false;
+let _rec=null,_recStream=null,_recChunks=[],_recStart=0,_holding=false,_srBroken=false;
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 function micDown(){
   if(_holding)return;_holding=true;
