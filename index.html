@@ -596,10 +596,13 @@ function pitchGenderF32(chunks,sr){
 /* 欢迎层逻辑 */
 function welHello(){
   try{speechSynthesis.cancel();}catch(e){}
-  _pendingSpeak=null; /* 欢迎语只有一个声源，清掉排队中的其他语音 */
+  _pendingSpeak=null;
   $("welStep2").classList.remove("hidden");
   $("welResult").textContent="";
-  playBuiltIn().catch(()=>speakCn("您好啊！我是您的英语老师，我叫 Anna。我应该怎么称呼您呢？请按住下面的按钮，告诉我您姓什么。比如：我姓李。"));
+  /* 欢迎语只有内置录音这一个声源：失败时排队重试内置，绝不用系统语音补播（杜绝两个声音） */
+  playBuiltIn().catch(()=>{
+    _pendingSpeak=()=>playBuiltIn().catch(()=>{});
+  });
 }
 /* 欢迎层按住说话（中文） */
 let _welHolding=false;
