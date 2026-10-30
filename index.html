@@ -179,6 +179,10 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
     <div style="margin-top:14px;">
       <button class="mini-btn org" style="width:100%;padding:14px;font-size:18px;" onclick="saveSettings()">保存</button>
     </div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="mini-btn" style="flex:1;padding:10px;" onclick="voiceDiag()">🔊 语音诊断</button>
+      <button class="mini-btn" style="flex:1;padding:10px;" onclick="micDiag()">🎤 麦克风诊断</button>
+    </div>
     <details style="margin-top:12px;"><summary style="font-size:14px;color:var(--muted);">高级：填写自己的 AI 密钥</summary>
       <input id="keyInput" type="password" placeholder="DeepSeek API Key（选填）" style="width:100%;border:2px solid var(--line);border-radius:12px;padding:10px;font-size:14px;margin-top:8px;">
       <div style="font-size:12px;color:var(--muted);margin-top:4px;">不填也能用。如果您有自己旧版「english-agent」的密钥，会自动带过来。</div>
@@ -326,10 +330,45 @@ function _playUrl(url,rate){
 function speakOnline(text,rate,quiet,lang){
   text=String(text).replace(/\s+/g," ").trim().slice(0,200);
   const lan=lang==="zh"?"zh":"en";
-  return _playUrl("https://fanyi.baidu.com/gettts?lan="+lan+"&spd=3&source=web&text="+encodeURIComponent(text),rate)
-  .catch(()=>{ if(lan==="en")return _playUrl("https://dict.youdao.com/dictvoice?le=en&q="+encodeURIComponent(text),rate); throw new Error("no zh fallback"); })
-  .catch(()=>edgeTTS(text,rate,lang==="zh"?"zh-CN-XiaoxiaoNeural":"en-US-AvaNeural").then(u=>_playUrl(u,rate)))
-  .catch(e=>{ if(!quiet)notice("语音播放失败：点一下屏幕任意位置，再点 🔊 重试"); throw e; });
+  const voice=lang==="zh"?"zh-CN-XiaoxiaoNeural":"en-US-AvaNeural";
+  /* 微信里 WebSocket 可用且音质最好，优先 Edge；再逐级降级，失败给可见提示 */
+  const tries=[
+    ()=>edgeTTS(text,rate,voice).then(u=>_playUrl(u,rate)),
+    ()=>_playUrl("https://tts.baidu.com/text2audio?tex="+encodeURIComponent(text)+"&cuid=se&lan="+(lan==="zh"?"zh":"en")+"&ctp=1&pdt=3011&vol=9",rate),
+    ()=>_playUrl("https://fanyi.baidu.com/gettts?lan="+lan+"&spd=3&source=web&text="+encodeURIComponent(text),rate),
+    ()=>{ if(lan!=="en")throw new Error("skip"); return _playUrl("https://dict.youdao.com/dictvoice?le=en&q="+encodeURIComponent(text),rate); }
+  ];
+  return tries.reduce((p,f)=>p.catch(f),Promise.reject())
+  .catch(e=>{ if(!quiet)notice("语音播放失败（"+String(e&&e.message||e)+"）。点右上角 ⚙️ 设置 → 🔊语音诊断 看详情"); throw e; });
+}
+/* 麦克风诊断：测权限/采集，报告环境能力 */
+async function micDiag(){
+  const out=[];
+  out.push("浏览器原生识别："+(("webkitSpeechRecognition"in window||"SpeechRecognition"in window)?"✅ 有（微信里通常没有）":"❌ 无（将走讯飞在线识别）"));
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({audio:true});
+    out.push("麦克风采集：✅ 正常（已拿到声音）");
+    st.getTracks().forEach(t=>t.stop());
+  }catch(e){
+    out.push("麦克风采集：❌ 失败（"+String(e&&e.name||e)+"）");
+    if(/MicroMessenger/i.test(navigator.userAgent))out.push("\n💡 微信里麦克风经常被限制。解决办法：\n点右上角「···」→ 选择「在浏览器打开」，语音功能全部可用。");
+  }
+  alert("麦克风诊断：\n\n"+out.join("\n")+"\n\n可截图发给开发者。");
+}
+/* 语音诊断：逐条链路试播，报告哪条通哪条断（用户可截图反馈） */
+async function voiceDiag(){
+  const tests=[
+    ["Edge 神经语音(推荐)",()=>edgeTTS("Hello! I am Anna.","1","en-US-AvaNeural").then(u=>_playUrl(u,1))],
+    ["百度在线语音",()=>_playUrl("https://tts.baidu.com/text2audio?tex="+encodeURIComponent("您好，我是Anna")+"&cuid=se&lan=zh&ctp=1&pdt=3011&vol=9",1)],
+    ["百度翻译语音",()=>_playUrl("https://fanyi.baidu.com/gettts?lan=en&spd=3&source=web&text=Hello",1)],
+    ["有道词典语音",()=>_playUrl("https://dict.youdao.com/dictvoice?le=en&q=Hello",1)]
+  ];
+  const out=[];
+  for(const [name,f] of tests){
+    try{ await f(); out.push("✅ "+name+"：正常"); }
+    catch(e){ out.push("❌ "+name+"：不通（"+String(e&&e.message||e).slice(0,40)+"）"); }
+  }
+  alert("语音诊断结果：\n\n"+out.join("\n")+"\n\n把这个截图发给开发者即可定位问题。\n（测试时会各播放一小段声音）");
 }
 function edgeTTS(text,rate,voice){
   return new Promise((resolve,reject)=>{
@@ -608,7 +647,14 @@ function startChat(s){
   $("homePage").style.display="none";$("cardPage").style.display="none";
   $("chatPage").style.display="flex";
   $("chatTitle").textContent="Anna · "+s.title;
-  $("chatSub").textContent="小提示：点对方的话可以重听";
+  $("chatSub").textContent=s.chat?"小提示：说话声音小也没关系，Anna 会认真听":"小提示：点对方的话可以重听";
+  // 微信内：提示麦克风受限时的出路
+  if(/MicroMessenger/i.test(navigator.userAgent)&&!$("wxTip")){
+    const tip=document.createElement("div");tip.id="wxTip";
+    tip.style.cssText="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:12px;padding:10px 12px;font-size:14px;margin:0 12px 8px;";
+    tip.innerHTML="📱 微信里语音可能受限。若“按住说话”没反应：点右上角「···」→「在浏览器打开」，一切功能正常。";
+    $("chatPage").insertBefore(tip,$("msgs"));
+  }
   $("msgs").innerHTML="";const th=document.createElement("div");th.id="thinking";th.style.display="none";th.textContent="…Anna 正在打字";$("msgs").appendChild(th);
   // 快捷句
   const qr=$("quickRow");qr.innerHTML="";
@@ -855,8 +901,12 @@ Rules: never scold; if learner makes a mistake, say the better way gently in �
   }else addAiMsg(reply);
   state.busy=false;
 }
+let _lastDemoChat=-1;
 function demoChatReply(){
-  return pickRnd([`哎，听您这么说我也高兴！后来呢，再给我讲讲？`,`是呀，家里人好才是真的好。您最近睡得踏实吗？`,`可不是嘛！对了，您知道"喝杯茶"用英语怎么说吗？Have a cup of tea，读作"哈夫·厄·卡普·奥夫·提"，您跟我念念？`,`您说得对，慢慢来，身体最要紧。今天吃了什么好吃的呀？`,`哈哈哈，您真有意思！我喜欢听您讲这些。您孙子孙女最近怎么样呀？`]);
+  let i=-1;
+  do{ i=Math.floor(Math.random()*5); }while(i===_lastDemoChat);
+  _lastDemoChat=i;
+  return [`哎，听您这么说我也高兴！后来呢，再给我讲讲？`,`是呀，家里人好才是真的好。您最近睡得踏实吗？`,`可不是嘛！对了，您知道"喝杯茶"用英语怎么说吗？Have a cup of tea，读作"哈夫·厄·卡普·奥夫·提"，您跟我念念？`,`您说得对，慢慢来，身体最要紧。今天吃了什么好吃的呀？`,`哈哈，我爱听您讲这些。您家里孩子们最近都好吗？`][i];
 }
 function demoReply(){
   const turn=state.history.filter(h=>h.role==="user").length;
@@ -905,7 +955,22 @@ function micUp(){
   micReset();
   const held=Date.now()-_recStart;
   if(SR&&_rec){ setTimeout(()=>{try{_rec&&_rec.stop();}catch(e){}},held<700?700-held:0); return; }
+  /* IAT 路径：松手后把录到的音频送去识别 */
+  const chunks=(window._iatChunks||[]).slice();
+  const sr=_iac?_iac.sampleRate:16000;
   stopIat();
+  if(!chunks.length){toast("没听到声音，请再按住说一次 🎤");return;}
+  $("thinking").style.display="block";
+  iatRecognize(chunks,sr,chatMode()?"zh":"en").then(t=>{
+    $("thinking").style.display="none";
+    showConfirm(t);
+  }).catch(e=>{
+    $("thinking").style.display="none";
+    const em=String(e&&e.message||e);
+    if(em.indexOf("识别连接失败")>-1||em.indexOf("超时")>-1)toast("语音服务连不上（"+em+"）。\n\n请检查手机网络，或稍后再试一次。");
+    else if(em.indexOf("太短")>-1)toast("按住的时间太短啦，按住后说完一句话再松手 🎤");
+    else toast("没听清，再按住说一次吧 🎤（"+em+"）");
+  });
 }
 function toast(msg){alert(msg);}
 /* —— 讯飞 IAT：按住期间持续录音，松手后识别 —— */
