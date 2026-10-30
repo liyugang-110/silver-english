@@ -558,13 +558,13 @@ function welHello(){
 /* 欢迎层按住说话（中文） */
 let _welHolding=false;
 function welMicDown(){
-  if(_welHolding)return;_welHolding=true;
+  if(_welHolding)return;_welHolding=true;_holding=true;_recStart=Date.now();
   $("welMic").classList.add("holding");$("welMic").textContent="🔴 正在听…请说“我姓李”";
   $("welResult").textContent="听您说呢…";
   iatDown();
 }
 function welMicUp(){
-  if(!_welHolding)return;_welHolding=false;
+  if(!_welHolding)return;_welHolding=false;_holding=false;
   $("welMic").classList.remove("holding");$("welMic").textContent="🎤 按住说话（说中文）";
   const chunks=(window._iatChunks||[]).slice();
   const sr=_iac?_iac.sampleRate:16000;
@@ -608,7 +608,7 @@ function toastName(xing){
     <div style="font-size:46px;">🤝</div>
     <div style="font-size:23px;font-weight:800;margin-top:8px;">认识您啦，${escapeHtml(xing)}${genderTitle()}！</div>
     <div style="font-size:17px;color:var(--muted);margin-top:8px;">以后每次来，Anna 都会这样叫您</div>
-    <button class="mini-btn org" style="margin-top:16px;padding:12px 26px;font-size:18px;" onclick="this.parentElement.parentElement.parentElement.remove()">好嘞，开始学！</button>
+    <button class="mini-btn org" style="margin-top:16px;padding:12px 26px;font-size:18px;" onclick="this.closest('div').parentElement.remove()">好嘞，开始学！</button>
   </div>`;
   document.body.appendChild(t);
   setTimeout(()=>{if(t.parentElement)t.remove();},6000);
