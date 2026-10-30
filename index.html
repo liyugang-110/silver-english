@@ -567,7 +567,7 @@ async function getIpaPhrase(text){
 
 /* ================= 称呼与欢迎流程 ================= */
 function genderTitle(){return state.gender==="m"?"叔叔":"阿姨";}
-function nameTitle(){return (state.nick||"")+(state.gender?genderTitle():"");}
+function nameTitle(){const t=genderTitle();if(state.nick&&state.nick===t.charAt(0))return t; /* 防止"叔"+"叔叔"=叔叔叔 */ return (state.nick||"")+(state.gender?genderTitle():"");}
 /* 音高判男女：对录音做自相关基频估计，中位 F0>160Hz 判女声 */
 function pitchGenderF32(chunks,sr){
   try{
@@ -1019,12 +1019,14 @@ function repeatGo(btn,target){
   if(_repBusy){notice("正在听您读呢，稍等一下～");return;}
   const row=btn.parentElement.parentElement;
   const res=row.querySelector(".rep-result");
+  /* 白盒加固：speak 万一永不返回（无声音/TTS异常），8 秒后强制放行，防 _repBusy 卡死 */
+  const speakGuard=p=>Promise.race([p,new Promise(r=>setTimeout(()=>{try{_pendingSpeak=null;}catch(e){}r();},8000))]);
   /* 首选：浏览器原生识别（快、自动断句），vivo/Chrome 等大多支持 */
   if(SR&&!_srBroken){
     try{
       _repBusy=true;res.style.display="block";res.style.color="var(--muted)";
       btn.disabled=true;btn.textContent="🔴 准备…先听一遍";
-      speak(target,null,true).then(()=>new Promise(r=>setTimeout(r,300))).then(()=>{
+      speakGuard(speak(target,null,true)).then(()=>new Promise(r=>setTimeout(r,300))).then(()=>{
         res.textContent="🎤 轮到您啦！大声跟读：";
         btn.textContent="🔴 正在听…读完自动停";
         const rec=new SR();rec.lang=chatMode()?"zh-CN":"en-US";rec.interimResults=false;rec.maxAlternatives=1;
@@ -1049,7 +1051,7 @@ function pcmRepeat(btn,target,res){
   _repBusy=true;
   res.style.display="block";res.style.color="var(--muted)";
   btn.disabled=true;btn.textContent="🔴 正在录音…请大声跟读";
-  speak(target,null,true).then(()=>{
+  speakGuard(speak(target,null,true)).then(()=>{
     res.textContent="轮到您啦！大声读出来：";
     return new Promise(r=>setTimeout(r,400));
   }).then(()=>{
