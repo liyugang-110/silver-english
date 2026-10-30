@@ -238,6 +238,7 @@ function playBuiltIn(){
   return new Promise((res,rej)=>{
     try{
       const a=new Audio("data:audio/mpeg;base64,"+WELCOME_B64);
+      window._welAudio=a;
       a.onended=()=>{_canAutoplay=true;res();};
       a.onerror=()=>rej(new Error("builtin-audio-fail"));
       a.play().catch(()=>rej(new Error("builtin-rejected")));
@@ -570,6 +571,7 @@ function pitchGenderF32(chunks,sr){
 /* 欢迎层逻辑 */
 function welHello(){
   try{speechSynthesis.cancel();}catch(e){}
+  _pendingSpeak=null; /* 欢迎语只有一个声源，清掉排队中的其他语音 */
   $("welStep2").classList.remove("hidden");
   $("welResult").textContent="";
   playBuiltIn().catch(()=>speakCn("您好啊！我是您的英语老师，我叫 Anna。我应该怎么称呼您呢？请按住下面的按钮，告诉我您姓什么。比如：我姓李。"));
@@ -579,6 +581,10 @@ let _welHolding=false;
 let _wrec=null;
 function welMicDown(){
   if(_welHolding)return;_welHolding=true;
+  /* 关键：先把正在播的语音全停掉，释放音频通道给麦克风 */
+  try{speechSynthesis.cancel();}catch(e){}
+  _pendingSpeak=null;
+  try{if(window._welAudio&&!window._welAudio.paused){window._welAudio.pause();window._welAudio.currentTime=0;}}catch(e){}
   $("welMic").classList.add("holding");$("welMic").textContent="🔴 正在听…请说“我姓李”";
   $("welResult").textContent="听您说呢…";
   /* 首选浏览器原生识别 */
@@ -681,7 +687,7 @@ function renderHome(){
   $("greetLine").textContent=greet;
   // ===== 陪伴感：像真人一样的问候（记得上次见面、打卡天数、语气随机变化） =====
   const today=todayStr();
-  const welOpen=$("welcomeModal")&&$("welcomeModal").style.display==="flex";
+  const welOpen=($("welcomeModal")&&$("welcomeModal").style.display==="flex")||!state.nick;
   if(who&&!welOpen&&localStorage.getItem("se_greeted")!==today){
     localStorage.setItem("se_greeted",today);
     const last=localStorage.getItem("se_lastVisit")||"";
