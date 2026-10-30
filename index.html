@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1.4,user-scalable=yes">
+<title>小银英语 · 跟AI外教轻松开口</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--text:#1e293b;--muted:#64748b;--primary:#e0553a;--primary-dark:#c9402a;--green:#15803d;--line:#e2e8f0;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden;}
+header{background:linear-gradient(135deg,#e0553a,#d97706);color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:9;}
+header h1{font-size:22px;}
+header .hbtn{background:rgba(255,255,255,.2);border:none;color:#fff;font-size:16px;padding:8px 14px;border-radius:12px;}
+main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
+.big-btn{display:flex;align-items:center;gap:12px;width:100%;background:var(--card);border:2px solid var(--line);border-radius:16px;padding:16px;font-size:19px;font-weight:600;text-align:left;margin-bottom:10px;color:var(--text);}
+.big-btn .em{font-size:30px;}
+.big-btn small{display:block;font-size:14px;color:var(--muted);font-weight:400;margin-top:2px;}
+.big-btn:active{background:#fff3ec;border-color:var(--primary);}
+.sec-title{font-size:18px;font-weight:700;margin:16px 0 10px;}
+/* 今日3句 */
+#todayCard{background:linear-gradient(135deg,#fff7ed,#fde8d7);border:2px solid #f5c896;border-radius:18px;padding:16px;margin-bottom:6px;}
+#todayCard h2{font-size:20px;margin-bottom:8px;}
+.sen-row{background:#fff;border-radius:14px;padding:12px;margin:8px 0;}
+.sen-row .en{font-size:19px;font-weight:700;line-height:1.4;}
+.sen-row .cn{font-size:16px;color:var(--muted);margin-top:3px;}
+.sen-row .hy{font-size:15px;color:#c9402a;margin-top:2px;}
+.sen-row .ipa{font-size:14px;color:#7c3aed;font-family:serif;margin-top:2px;}
+.sen-row .btns{display:flex;gap:8px;margin-top:8px;}
+.mini-btn{border:none;border-radius:10px;padding:8px 14px;font-size:15px;font-weight:600;background:#eef2f7;color:#1e293b;}
+.mini-btn.org{background:var(--primary);color:#fff;}
+.mini-btn:active{opacity:.7;}
+#doneToday{width:100%;border:none;border-radius:14px;padding:14px;font-size:19px;font-weight:700;background:var(--green);color:#fff;margin-top:10px;}
+#doneToday:disabled{background:#cbd5e1;}
+/* 日历 */
+#calRow{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.cal-day{width:34px;height:34px;border-radius:50%;background:#eef2f7;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);}
+.cal-day.flower{background:#ffe4e0;font-size:18px;}
+/* 对话页 */
+#chatPage{display:none;flex-direction:column;height:100dvh;max-width:520px;margin:0 auto;}
+#chatHead{background:linear-gradient(135deg,#e0553a,#d97706);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+#chatHead button{background:rgba(255,255,255,.2);border:none;color:#fff;font-size:17px;padding:6px 12px;border-radius:10px;}
+#msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}
+.msg{max-width:92%;padding:12px 14px;border-radius:16px;font-size:19px;line-height:1.5;}
+.msg.ai{background:var(--card);border:2px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px;}
+.msg.user{background:#e0553a;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.msg .cn{display:block;font-size:16px;color:var(--muted);margin-top:4px;}
+.msg.user .cn{color:#ffe0d6;}
+.msg .sec{font-size:14px;color:#c9402a;margin-top:8px;font-weight:700;}
+.drill-row{margin:8px 0;background:#f8fafc;border-radius:12px;padding:8px;}
+.drill-row .den{font-size:18px;font-weight:700;}
+.drill-row .dcn{font-size:15px;color:var(--muted);}
+.drill-row .dhy{font-size:14px;color:#c9402a;}
+.drill-row .dipa{font-size:13px;color:#7c3aed;font-family:serif;}
+#inputBar{flex-shrink:0;background:#fff;border-top:2px solid var(--line);padding:10px 12px 14px;}
+#quickRow{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;}
+#quickRow button{flex-shrink:0;border:2px solid #f5c896;background:#fff7ed;border-radius:12px;padding:8px 14px;font-size:16px;font-weight:600;}
+#micBtn{width:100%;border:none;border-radius:16px;padding:18px;font-size:21px;font-weight:700;background:var(--primary);color:#fff;margin-top:4px;}
+#micBtn.holding{background:var(--primary-dark);transform:scale(.98);}
+#typeRow{display:flex;gap:8px;margin-top:8px;}
+#typeInput{flex:1;border:2px solid var(--line);border-radius:12px;padding:10px 12px;font-size:18px;}
+#sendBtn{border:none;border-radius:12px;padding:10px 18px;font-size:18px;font-weight:700;background:#eef2f7;}
+#confirmBox{display:none;background:#fff7ed;border:2px solid var(--primary);border-radius:14px;padding:12px;margin-top:8px;}
+#confirmBox .txt{font-size:19px;font-weight:700;}
+#confirmBox .btns{display:flex;gap:10px;margin-top:8px;}
+#thinking{display:none;align-self:flex-start;color:var(--muted);font-size:16px;padding:8px 4px;}
+/* 弹窗 */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99;align-items:center;justify-content:center;padding:20px;}
+.modal .box{background:#fff;border-radius:20px;padding:20px;max-width:420px;width:100%;max-height:85dvh;overflow-y:auto;}
+.modal h3{font-size:20px;margin-bottom:12px;}
+.rate-btn{display:block;width:100%;border:2px solid var(--line);border-radius:14px;padding:16px;font-size:19px;font-weight:700;margin-bottom:10px;background:#fff;}
+.rate-btn.on{background:var(--primary);color:#fff;border-color:var(--primary);}
+/* 炫耀卡 */
+#cardPage{display:none;min-height:100dvh;background:linear-gradient(160deg,#e0553a,#d97706);padding:30px 18px;}
+#shareCard{background:#fff;border-radius:22px;padding:24px;max-width:420px;margin:0 auto;text-align:center;}
+#shareCard h2{font-size:24px;color:var(--primary);}
+#shareCard .who{font-size:17px;color:var(--muted);margin-top:4px;}
+#shareCard .lines{text-align:left;margin-top:14px;}
+#shareCard .lines .en{font-size:20px;font-weight:700;margin-top:10px;}
+#shareCard .lines .cn{font-size:16px;color:var(--muted);}
+.tip-photo{color:#fff;text-align:center;font-size:18px;margin-top:16px;font-weight:600;}
+.hidden{display:none!important;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧓 小银英语</h1>
+  <button class="hbtn" onclick="openSettings()">⚙️ 设置</button>
+</header>
+
+<main id="homePage">
+  <div id="greetLine" style="font-size:18px;margin:6px 0 12px;"></div>
+  <div id="todayCard">
+    <h2>📋 今天的 3 句</h2>
+    <div id="todayList"></div>
+    <button id="doneToday" onclick="finishToday()">✅ 我都跟读过了，打卡！</button>
+  </div>
+  <div class="sec-title">🗓️ 我的坚持</div>
+  <div id="calRow"></div>
+  <div class="sec-title">🎯 情景练一练（点一个开始）</div>
+  <div id="sceneList"></div>
+  <div style="height:14px"></div>
+</main>
+
+<div id="chatPage">
+  <div id="chatHead">
+    <button onclick="goHome()">← 回家</button>
+    <div><div id="chatTitle" style="font-size:20px;font-weight:700;">Anna</div>
+    <div id="chatSub" style="font-size:14px;opacity:.9;"></div></div>
+  </div>
+  <div id="msgs"><div id="thinking">…Anna 正在打字</div></div>
+  <div id="inputBar">
+    <div id="quickRow"></div>
+    <button id="micBtn">🎤 按住说话（说英语）</button>
+    <div id="confirmBox">
+      <div style="font-size:14px;color:var(--muted);">您刚才说的是：</div>
+      <div class="txt" id="confirmTxt"></div>
+      <div class="btns">
+        <button class="mini-btn org" id="okBtn">✅ 没错，发送</button>
+        <button class="mini-btn" id="retryBtn">🔄 说错了，重说</button>
+      </div>
+    </div>
+    <div id="typeRow">
+      <input id="typeInput" placeholder="也可以打字（点这里用键盘语音）">
+      <button id="sendBtn" onclick="sendText()">发送</button>
+    </div>
+  </div>
+</div>
+
+<div id="cardPage">
+  <div id="shareCard"></div>
+  <div class="tip-photo">📱 长按下方按钮复制文字，或截图发到家庭群</div>
+  <div style="text-align:center;margin-top:14px;">
+    <button class="mini-btn" style="padding:12px 22px;font-size:17px;" onclick="copyCard()">📋 复制文字</button>
+    <button class="mini-btn" style="padding:12px 22px;font-size:17px;margin-left:8px;" onclick="goHome()">🏠 回家</button>
+  </div>
+</div>
+
+<div class="modal" id="settingsModal">
+  <div class="box">
+    <h3>⚙️ 设置</h3>
+    <div style="font-size:16px;margin-bottom:8px;font-weight:700;">🗣️ Anna 说话速度</div>
+    <button class="rate-btn" data-rate="slow" onclick="setRate('slow')">🐢 慢慢说（第一次学推荐）</button>
+    <button class="rate-btn" data-rate="mid" onclick="setRate('mid')">🐢 慢一点（默认）</button>
+    <button class="rate-btn" data-rate="fast" onclick="setRate('fast')">▶️ 正常语速</button>
+    <div style="font-size:16px;margin:14px 0 8px;font-weight:700;">👋 Anna 怎么称呼您</div>
+    <input id="nickInput" placeholder="比如：李阿姨" style="width:100%;border:2px solid var(--line);border-radius:12px;padding:12px;font-size:18px;">
+    <div style="margin-top:14px;">
+      <button class="mini-btn org" style="width:100%;padding:14px;font-size:18px;" onclick="saveSettings()">保存</button>
+    </div>
+    <details style="margin-top:12px;"><summary style="font-size:14px;color:var(--muted);">高级：填写自己的 AI 密钥</summary>
+      <input id="keyInput" type="password" placeholder="DeepSeek API Key（选填）" style="width:100%;border:2px solid var(--line);border-radius:12px;padding:10px;font-size:14px;margin-top:8px;">
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">不填也能用。如果您有自己旧版「english-agent」的密钥，会自动带过来。</div>
+    </details>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================= 工具 ================= */
+function $(id){return document.getElementById(id);}
+function escapeHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function todayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+
+/* ================= 场景（6 个生存场景）================= */
+const SCENES=[
+{id:"shop",emoji:"🛒",title:"买东西卖东西",goal:"当售货员：招呼客人、报价、收钱",
+ role:"You are a foreign customer in a Chinese shop. You ONLY speak English. You want to buy fruit, tea or souvenirs. Ask about price, ask to try or see things, then pay. You never speak Chinese. Speak slowly and simply.",
+ open:["Hello! Do you speak English? I want to buy some tea.","你好！你会说英语吗？我想买点茶叶。","Hello! Yes. How about this green tea? It's very popular.","你好！会的。这款绿茶怎么样？很受欢迎的。"],
+ quick:[["How much is it?","多少钱？"],["Here you are.","给您。"],["This one, please.","要这个。"],["Altogether 30 yuan.","一共30元。"]],
+ sentences:[["How much is it?","这个多少钱？","豪·马奇·伊兹·伊特？"],["It's 30 yuan for one bag.","一袋30元。","伊茨·瑟提·尤安·佛·万·拜格。"],["Here you are. Thank you!","给您，谢谢！","希尔·尤·阿。三克尤！"],["Do you want anything else?","您还要别的吗？","杜·尤·旺特·埃尼辛·艾尔斯？"]]},
+{id:"taxi",emoji:"🚕",title:"打车",goal:"当司机：问去哪、报价、送达",
+ role:"You are a foreign passenger in a Chinese taxi. You ONLY speak English. Tell the driver where you want to go (hotel, airport, train station), ask how long and how much. You never speak Chinese.",
+ open:["Hi! Could you take me to the Holiday Hotel?","你好！能送我去假日酒店吗？","Sure, hop in! It takes about 20 minutes.","好的，请上车！大概20分钟。"],
+ quick:[["Where to?","去哪儿？"],["It takes 20 minutes.","要20分钟。"],["That'll be 45 yuan.","一共45元。"],["Here we are.","到了。"]],
+ sentences:[["Where to? Where are you heading?","去哪儿？您去哪里？","维尔·图？维尔·阿·尤·海丁？"],["It takes about 20 minutes.","大概要20分钟。","伊茨·忒克斯·厄鲍特·图恩提·敏尼茨。"],["That'll be 45 yuan, please.","一共45元，谢谢。","扎特尔·比·佛提·法伊夫·尤安，普利兹。"],["Here we are. Have a nice day!","到了，祝您愉快！","希尔·威·阿。哈夫·厄·奈斯·戴！"]]},
+{id:"food",emoji:"🍜",title:"餐厅点餐",goal:"当服务员：招呼、推荐、点单、结账",
+ role:"You are a foreign customer in a Chinese restaurant. You ONLY speak English. You are hungry, ask what the waiter recommends, can't read the Chinese menu, then order and pay. You never speak Chinese.",
+ open:["Hello! A table for two, please. I can't read the menu.","你好！两位。我看不懂菜单。","Welcome! No problem. I can help you order.","欢迎！没问题，我帮您点。"],
+ quick:[["Are you ready to order?","可以点餐了吗？"],["I recommend the beef noodles.","我推荐牛肉面。"],["Is it spicy?","辣吗？"],["Altogether 88 yuan.","一共88元。"]],
+ sentences:[["Are you ready to order?","可以点餐了吗？","阿·尤·雷迪·图·奥德？"],["I recommend the beef noodles. It's not spicy.","我推荐牛肉面，不辣。","艾·瑞克门德·泽·比夫·努多兹。伊茨·瑙特·斯派西。"],["Anything to drink?","要喝点什么吗？","埃尼辛·图·准克？"],["Altogether 88 yuan. Card or cash?","一共88元，刷卡还是现金？","奥尔特盖泽·艾提·艾特·尤安。卡德·奥·卡什？"]]},
+{id:"hotel",emoji:"🏨",title:"酒店前台",goal:"当前台：办入住、答问题、退房",
+ role:"You are a foreign guest checking in at a Chinese hotel. You ONLY speak English. You have a booking, ask about breakfast and Wi-Fi, ask for a towel, then check out. You never speak Chinese.",
+ open:["Hello, I'd like to check in, please. My name is Smith.","你好，我想办理入住，我叫史密斯。","Welcome, Mr. Smith! May I see your passport?","欢迎，史密斯先生！请出示您的护照。"],
+ quick:[["Do you have a reservation?","您有预订吗？"],["Breakfast is from 7 to 10.","早餐7点到10点。"],["The Wi-Fi password is 88888888.","WiFi密码是88888888。"],["Here's your key card.","这是您的房卡。"]],
+ sentences:[["Do you have a reservation?","您有预订吗？","杜·尤·哈夫·厄·瑞泽维申？"],["May I see your passport, please?","请出示您的护照。","梅·艾·西·尤·帕斯波特，普利兹？"],["Breakfast is from 7 to 10, second floor.","早餐7点到10点，在二楼。","布雷克弗斯特·伊兹·弗罗姆·赛文·图·坦，赛肯德·弗洛。"],["Here's your key card, Room 506. Enjoy!","这是房卡，506房。祝您愉快！","希尔兹·尤·基·卡德，鲁姆·法伊夫·欧·西克斯。恩乔伊！"]]},
+{id:"way",emoji:"🗺️",title:"给老外指路",goal:"当热心本地人：听懂问路、指路",
+ role:"You are a foreign tourist in China. You ONLY speak English. You are lost: ask the local person for the subway station, bank, bathroom or a famous place, ask if it's far. You never speak Chinese.",
+ open:["Excuse me! Is there a subway station near here?","打扰一下！这附近有地铁站吗？","Yes! Go straight and turn left. It's very close.","有！直走然后左转，很近的。"],
+ quick:[["Go straight, then turn left.","直走然后左转。"],["It's about 500 meters.","大概500米。"],["You can take the bus.","可以坐公交。"],["This way, please.","这边请。"]],
+ sentences:[["Go straight for about 500 meters.","直走大约500米。","够·斯特雷特·佛·厄鲍特·法伊夫·杭德瑞德·米特兹。"],["Then turn left at the traffic light.","然后在红绿灯左转。","泽恩·特恩·莱夫特·阿特·泽·特拉菲克·莱特。"],["It's too far to walk. Take a taxi.","走路太远，打车吧。","伊茨·图·法·图·沃克。忒克·厄·塔克西。"],["This way, please. I'll show you.","这边请，我带您去。","迪斯·威，普利兹。艾尔·绍·尤。"]]},
+{id:"help",emoji:"🆘",title:"听不懂/求助",goal:"万能救命句：听不懂、慢点说、找帮忙",
+ role:"You are a friendly foreigner chatting with a Chinese beginner. You ONLY speak English. Speak slowly. Ask simple small-talk questions (name, where from) so the learner can practice asking you to repeat and slow down. You never speak Chinese.",
+ open:["Hi! Nice to meet you! Where are you from?","你好！很高兴认识你！你来自哪里？","Nice to meet you too! I'm from Beijing.","也很高兴认识你！我来自北京。"],
+ quick:[["Sorry, I don't understand.","对不起，我没听懂。"],["Could you say it again, slower?","能慢点再说一遍吗？"],["Wait a moment, please.","请稍等。"],["I'll call someone to help.","我找人来帮忙。"]],
+ sentences:[["Sorry, I don't understand.","对不起，我没听懂。","索瑞，艾·东特·安德斯坦德。"],["Could you say it again, slower?","您能慢点再说一遍吗？","库德·尤·塞·伊特·厄根，斯洛尔？"],["Wait a moment, please.","请稍等一下。","维特·厄·莫门特，普利兹。"],["I'll call someone to help us.","我找个人来帮我们。","艾尔·科尔·萨姆万·图·海尔普·阿斯。"]]}
+];
+
+/* ================= 状态 ================= */
+const RATES={slow:0.55,mid:0.7,fast:0.85};
+const state={
+  nick:localStorage.getItem("se_nick")||"",
+  rate:localStorage.getItem("se_rate")||"mid",
+  key:localStorage.getItem("se_key")||(localStorage.getItem("anna_key")||""), // 自动继承旧版密钥
+  xfAppid:"ff8487eb",
+  xfKey:"a072aa918cf53af7e2bc23f242d351f5",
+  xfSecret:atob("TmpKbVpUUmxZbVkxTm1Ka1pERm1ORGcxTWpoalpqTmo="),
+  history:[],current:null,busy:false
+};
+function save(){localStorage.setItem("se_nick",state.nick);localStorage.setItem("se_rate",state.rate);localStorage.setItem("se_key",state.key);}
+function curRate(){return RATES[state.rate]||0.7;}
+
+/* ================= 朗读（复用多链路：浏览器→百度→有道→Edge神经） ================= */
+let _canAutoplay=true,_ttsBroken=false;
+function _canUseTTS(){ if(_ttsBroken)return false; if(!("speechSynthesis" in window))return false; if(/MicroMessenger/i.test(navigator.userAgent))return false; return true; }
+function speak(text,rate,quiet){
+  text=(text||"").trim(); if(!text)return Promise.resolve();
+  const r=rate||curRate();
+  if(_canUseTTS()){
+    return new Promise((res,rej)=>{
+      try{
+        speechSynthesis.cancel();
+        const u=new SpeechSynthesisUtterance(text);
+        u.lang="en-US";u.rate=r;
+        const vs=speechSynthesis.getVoices();
+        const v=vs.find(v=>/en[-_]US/i.test(v.lang)&&/female|samantha|zira|aria|jenny/i.test(v.name))||vs.find(v=>/^en/i.test(v.lang));
+        if(v)u.voice=v;
+        u.onend=()=>{_canAutoplay=true;res();};
+        u.onerror=()=>{_ttsBroken=true;_canAutoplay=false;speakOnline(text,r,quiet).then(res,rej);};
+        speechSynthesis.speak(u);
+      }catch(e){ speakOnline(text,r,quiet).then(res,rej); }
+    });
+  }
+  return speakOnline(text,r,quiet);
+}
+function _playUrl(url,rate){
+  return new Promise((res,rej)=>{
+    const a=new Audio();
+    a.playbackRate=rate?Math.min(1.5,Math.max(0.6,rate+0.15)):1;
+    a.onended=()=>{_canAutoplay=true;res();};a.onerror=()=>{_canAutoplay=false;rej();};
+    a.src=url;
+    a.play().then(()=>{}).catch(()=>{_canAutoplay=false;rej();});
+    setTimeout(()=>rej(new Error("timeout")),12000);
+  });
+}
+function speakOnline(text,rate,quiet){
+  text=String(text).replace(/\s+/g," ").trim().slice(0,200);
+  return _playUrl("https://fanyi.baidu.com/gettts?lan=en&spd=3&source=web&text="+encodeURIComponent(text),rate)
+  .catch(()=>_playUrl("https://dict.youdao.com/dictvoice?le=en&q="+encodeURIComponent(text),rate))
+  .catch(()=>edgeTTS(text,rate).then(u=>_playUrl(u,rate)))
+  .catch(e=>{ if(!quiet)alert("语音播放失败：请点一下屏幕任意位置，再点 🔊 重试"); throw e; });
+}
+function edgeTTS(text,rate){
+  return new Promise((resolve,reject)=>{
+    const TRUSTED="6A5AA1D4EAFF4E9FB37E23D68491D6F4";
+    if(!window.crypto||!crypto.subtle||!window.WebSocket){reject(new Error("unsupported"));return;}
+    const t=(BigInt(Math.floor(Date.now()/1000))+11644473600n)*10000000n;
+    const rounded=(t/3000000000n)*3000000000n;
+    crypto.subtle.digest("SHA-256",new TextEncoder().encode(rounded.toString()+TRUSTED)).then(hash=>{
+      const gec=[...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,"0")).join("").toUpperCase();
+      let ws;
+      try{ws=new WebSocket("wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken="+TRUSTED+"&Sec-MS-GEC="+gec+"&Sec-MS-GEC-Version=1-131.0.2903.99");}
+      catch(e){reject(e);return;}
+      ws.binaryType="arraybuffer";
+      const chunks=[];let timer=setTimeout(()=>{try{ws.close();}catch(e){}reject(new Error("edge timeout"));},15000);
+      ws.onopen=()=>{
+        const id=crypto.randomUUID().replace(/-/g,"");
+        const date=new Date().toString();
+        ws.send(`X-Timestamp:${date}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`);
+        const ratePct=rate&&rate<1?"-"+Math.round((1-rate)*100)+"%":"+0%";
+        const ssml=`<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><voice name='en-US-AvaNeural'><prosody rate='${ratePct}'>${text.replace(/[<>&]/g," ")}</prosody></voice></speak>`;
+        ws.send(`X-RequestId:${id}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${date}Z\r\nPath:ssml\r\n\r\n${ssml}`);
+      };
+      ws.onmessage=ev=>{
+        if(typeof ev.data==="string"){
+          if(ev.data.includes("Path:turn.end")){clearTimeout(timer);try{ws.close();}catch(e){}resolve(URL.createObjectURL(new Blob(chunks,{type:"audio/mp3"})));}
+        }else if(ev.data instanceof ArrayBuffer){
+          const dv=new DataView(ev.data);const hlen=dv.getUint16(0);
+          chunks.push(new Uint8Array(ev.data,2+hlen));
+        }
+      };
+      ws.onerror=()=>{clearTimeout(timer);reject(new Error("edge error"));};
+    }).catch(reject);
+  });
+}
+if("speechSynthesis" in window){speechSynthesis.onvoiceschanged=()=>{};}
+
+/* ================= 音标（逐词查询拼接） ================= */
+const _ipaCache={};
+async function getIpa(text){
+  const w=(String(text||"").trim().split(/\s+/)[0].replace(/[^a-zA-Z']/g,"").toLowerCase());
+  if(!w)return "";
+  if(_ipaCache[w]!==undefined)return _ipaCache[w];
+  try{
+    const d=await(await fetch("https://api.dictionaryapi.dev/api/v2/entries/en/"+encodeURIComponent(w))).json();
+    let ipa=Array.isArray(d)?(d[0].phonetic||(d[0].phonetics.find(p=>p.text)||{}).text||""):"";
+    ipa=ipa.replace(/\/+/g,"").replace(/[!?.,;:"()\[\]0-9]/g,"").trim();
+    _ipaCache[w]=ipa;return ipa;
+  }catch(e){_ipaCache[w]="";return "";}
+}
+const _ipaPhraseCache={};
+async function getIpaPhrase(text){
+  const key=String(text||"").trim().toLowerCase();
+  if(_ipaPhraseCache[key]!==undefined)return _ipaPhraseCache[key];
+  const words=(String(text||"").match(/[A-Za-z']+/g))||[];
+  if(!words.length)return "";
+  const ipas=await Promise.all(words.map(w=>getIpa(w)));
+  const r=words.map((w,i)=>(ipas[i]||"").trim()||w.toLowerCase()).join(" ").trim();
+  _ipaPhraseCache[key]=r;return r;
+}
+
+/* ================= 首页渲染 ================= */
+function hashDay(){const s=todayStr();let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h;}
+function renderHome(){
+  const hour=new Date().getHours();
+  const hi=state.nick?`${state.nick}，`:"";
+  $("greetLine").textContent=hour<11?`${hi}早上好！☀️ 学 3 句，2 分钟就好`:(hour<18?`${hi}下午好！☀️ 学 3 句，2 分钟就好`:`${hi}晚上好！🌙 学 3 句，2 分钟就好`);
+  // 今日 3 句
+  const pool=[];SCENES.forEach(s=>s.sentences.forEach(t=>pool.push({scene:s,t})));
+  const h=hashDay();
+  const picks=[pool[h%pool.length],pool[(h*7+3)%pool.length],pool[(h*13+11)%pool.length]];
+  const uniq=[];const seen={};
+  picks.forEach(p=>{if(!seen[p.t[0]]){seen[p.t[0]]=1;uniq.push(p);}});
+  while(uniq.length<3){const p=pool[(h*17+uniq.length*5)%pool.length];if(!seen[p.t[0]]){seen[p.t[0]]=1;uniq.push(p);}else break;}
+  const list=$("todayList");list.innerHTML="";
+  uniq.forEach((p,i)=>{
+    const d=document.createElement("div");d.className="sen-row";
+    const safe=p.t[0].replace(/'/g,"\\'");
+    d.innerHTML=`<div class="en"><span onclick="speak('${safe}')" style="cursor:pointer">🔊</span> ${escapeHtml(p.t[0])}</div>
+      <div class="cn">🇨🇳 ${escapeHtml(p.t[1])}</div>
+      <div class="hy">🗣️ 谐音：${escapeHtml(p.t[2])}</div>
+      <div class="ipa" id="tipa${i}"></div>
+      <div class="btns"><button class="mini-btn" onclick="speak('${safe}',0.55)">🐢 慢速</button>
+      <button class="mini-btn" onclick="speak('${safe}')">▶️ 正常</button></div>`;
+    list.appendChild(d);
+    setTimeout(()=>{getIpaPhrase(p.t[0]).then(ipa=>{const el=$("tipa"+i);if(el&&ipa)el.textContent="/"+ipa+"/";});},120);
+  });
+  // 场景
+  const sl=$("sceneList");sl.innerHTML="";
+  SCENES.forEach(s=>{
+    const b=document.createElement("button");b.className="big-btn";
+    b.innerHTML=`<span class="em">${s.emoji}</span><span>${s.title}<small>${s.goal}</small></span>`;
+    b.onclick=()=>startChat(s);
+    sl.appendChild(b);
+  });
+  renderCal();
+}
+function renderCal(){
+  const row=$("calRow");row.innerHTML="";
+  const checks={};try{checks=JSON.parse(localStorage.getItem("se_check")||"{}");}catch(e){}
+  const days=[];
+  for(let i=27;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d);}
+  days.forEach(d=>{
+    const key=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    const div=document.createElement("div");div.className="cal-day"+(checks[key]?" flower":"");
+    div.textContent=checks[key]?"🌸":d.getDate();
+    div.title=key;
+    row.appendChild(div);
+  });
+  const n=Object.keys(checks).length;
+  const t=document.createElement("div");t.style.cssText="width:100%;font-size:15px;color:var(--muted);margin-top:4px;";
+  t.textContent=n?`已经坚持 ${n} 天啦，真棒！👍`:"今天打第一个卡吧！";
+  row.appendChild(t);
+}
+function finishToday(){
+  const checks=JSON.parse(localStorage.getItem("se_check")||"{}");
+  if(checks[todayStr()]){$("doneToday").disabled=true;$("doneToday").textContent="🌸 今天已打卡，明天再来！";return;}
+  checks[todayStr()]=1;localStorage.setItem("se_check",JSON.stringify(checks));
+  renderCal();
+  $("doneToday").disabled=true;$("doneToday").textContent="🌸 打卡成功！真棒！";
+  showShareCard();
+}
+
+/* ================= 对话 ================= */
+function goHome(){
+  $("chatPage").style.display="none";$("cardPage").style.display="none";
+  $("homePage").style.display="block";
+  try{window.speechSynthesis&&speechSynthesis.cancel();}catch(e){}
+  try{stopIat();}catch(e){}
+  renderHome();
+  window.scrollTo(0,0);
+}
+function startChat(s){
+  state.current=s;state.history=[];
+  $("homePage").style.display="none";$("cardPage").style.display="none";
+  $("chatPage").style.display="flex";
+  $("chatTitle").textContent="Anna · "+s.title;
+  $("chatSub").textContent="小提示：点对方的话可以重听";
+  $("msgs").innerHTML="";const th=document.createElement("div");th.id="thinking";th.style.display="none";th.textContent="…Anna 正在打字";$("msgs").appendChild(th);
+  // 快捷句
+  const qr=$("quickRow");qr.innerHTML="";
+  s.quick.forEach(q=>{
+    const b=document.createElement("button");b.textContent=q[0]+" "+q[1];
+    b.onclick=()=>{addMsg("user",q[0],q[1]);sendToAnna(q[0]);};
+    qr.appendChild(b);
+  });
+  $("confirmBox").style.display="none";
+  addOpening(s);
+}
+function addOpening(s){
+  const box=$("msgs");
+  const d=document.createElement("div");d.className="msg ai";
+  const situa=`（${s.title}。对方是不懂中文的外国人，他先开口了——您听懂后回应他）`;
+  const gEn=s.open[0],gCn=s.open[1],rEn=s.open[2],rCn=s.open[3];
+  const gSafe=gEn.replace(/'/g,"\\'"),rSafe=rEn.replace(/'/g,"\\'");
+  d.innerHTML=`<span class="cn">${escapeHtml(situa)}</span>
+    <div style="font-size:14px;color:var(--muted);margin-top:6px;">🧑 对方说：</div>
+    <div style="font-weight:700;"><span onclick="speak('${gSafe}')" style="cursor:pointer">🔊</span> ${escapeHtml(gEn)}</div>
+    <span class="cn">🇨🇳 ${escapeHtml(gCn)}</span>
+    <div class="sec">✏️ 您可以这样回应：</div>
+    <div style="font-weight:700;"><span onclick="speak('${rSafe}')" style="cursor:pointer">🔊</span> ${escapeHtml(rEn)}</div>
+    <span class="cn">🇨🇳 ${escapeHtml(rCn)}</span>`;
+  box.appendChild(d);
+  attachDrill(d,`先跟 Anna 学您的回应 || ${rEn}|${rCn}`);
+  box.scrollTop=box.scrollHeight;
+  speak(gEn,null,true).catch(()=>{}).then(()=>{speak(rEn,null,true).catch(()=>{});});
+}
+function addMsg(role,en,cn){
+  const box=$("msgs");$("thinking").style.display="none";
+  const d=document.createElement("div");d.className="msg "+role;
+  if(role==="user"){d.textContent=en;if(cn)d.innerHTML+="\n"+`<span class="cn">${escapeHtml(cn)}</span>`;}
+  box.appendChild(d);box.scrollTop=box.scrollHeight;
+  return d;
+}
+function splitAnna(text){
+  const norm=String(text||"").replace(/\uFE0F/g,"");
+  const get=(startMarks,endMarks)=>{
+    for(const s of startMarks){
+      const i=norm.indexOf(s);if(i<0)continue;
+      let end=norm.length;
+      for(const e of endMarks||[]){const j=norm.indexOf(e,i+s.length);if(j>-1){end=Math.min(end,j);break;}}
+      return norm.slice(i+s.length,end).replace(/^[:：\s]*/,"").trim();
+    }
+    return "";
+  };
+  return{
+    reply:norm.split(/🇨🇳|💡|🎓/)[0].trim(),
+    cn:get(["🇨🇳"],["💡","🎓"]),
+    hint:get(["💡 怎么答","💡怎么答","💡"],["🎓"]),
+    drill:get(["🎓 跟我读","🎓跟我读","🎓"])
+  };
+}
+function addAiMsg(text){
+  const box=$("msgs");$("thinking").style.display="none";
+  const d=document.createElement("div");d.className="msg ai";
+  const p=splitAnna(text);
+  let html=`<span onclick="speak('${p.reply.replace(/'/g,"\\'")}')" style="cursor:pointer">🔊</span> ${escapeHtml(p.reply)}`;
+  if(p.cn)html+=`<span class="cn">🇨🇳 ${escapeHtml(p.cn)}</span>`;
+  d.innerHTML=html;
+  if(p.hint){
+    const m=p.hint.match(/你可以说[:：]\s*["“]?([^"”（(]+)["”]?\s*[（(]([^）)]*)[）)]?/);
+    const refTxt=m?m[1].trim():"";
+    let hh=`<div class="sec">💡 怎么答：${escapeHtml(m?p.hint.replace(m[0],"").trim():p.hint)}`;
+    if(m){
+      const rSafe=refTxt.replace(/'/g,"\\'");
+      hh+=`<div style="font-weight:700;margin-top:6px;"><span onclick="speak('${rSafe}')" style="cursor:pointer">🔊</span> ${escapeHtml(refTxt)}</div>
+      <span class="cn">🇨🇳 ${escapeHtml(m[2]?m[2].trim():"（意思见上面）")}</span>`;
+    }
+    hh+=`</div>`;d.innerHTML+=hh;
+  }
+  box.appendChild(d);
+  if(p.drill)attachDrill(d,p.drill);
+  box.scrollTop=box.scrollHeight;
+  // 自动朗读：先 Anna 的话，再参考回答
+  const m=(p.hint||"").match(/你可以说[:：]\s*["“]?([^"”（(]+)["”]?\s*[（(]/);
+  let refRef=null;
+  if(m&&m[1].trim())refRef=m[1].trim();
+  else{const m2=(p.hint||"").match(/你可以说[:：]\s*["“]?([^"”（(]+)["”]?\s*$/);if(m2&&m2[1].trim())refRef=m2[1].trim();}
+  speak(p.reply||text,null,true).catch(()=>{}).then(()=>{ if(refRef)speak(refRef,null,true).catch(()=>{}); });
+  return d;
+}
+/* 跟我读卡片：片段格式 英文|中文|谐音 */
+function attachDrill(el,raw){
+  if(!raw)return;
+  const segs=String(raw).split("||").map(s=>s.trim()).filter(Boolean);
+  if(!segs.length)return;
+  let guide="跟我读：";let pieces=[];
+  const first=segs[0];
+  if(/[\u4e00-\u9fa5]/.test(first)&&!/\|/.test(first)){
+    guide=first;pieces=segs.slice(1);
+  }else pieces=segs;
+  pieces=pieces.map(p=>{
+    const m=p.split("|");
+    const en=(m[0]||"").replace(/[\u4e00-\u9fa5]/g,"").trim();
+    const cn=(m[1]||"").trim();
+    const hy=(m[2]||"").trim();
+    return /[A-Za-z]/.test(en)?{en,cn,hy}:null;
+  }).filter(Boolean);
+  if(!pieces.length)return;
+  const bar=document.createElement("div");bar.style.marginTop="8px";
+  bar.innerHTML=`<div class="sec">👩‍🏫 ${escapeHtml(guide)}</div>`;
+  pieces.forEach(p=>{
+    const safe=p.en.replace(/'/g,"\\'");
+    const row=document.createElement("div");row.className="drill-row";
+    row.innerHTML=`<div class="den"><span onclick="speak('${safe}')" style="cursor:pointer">🔊</span> ${escapeHtml(p.en)}</div>
+      <div class="dcn">🇨🇳 ${escapeHtml(p.cn||"（意思见上面）")}</div>
+      ${p.hy?`<div class="dhy">🗣️ 谐音：${escapeHtml(p.hy)}</div>`:""}
+      <div class="dipa"></div>
+      <div class="btns" style="display:flex;gap:8px;margin-top:4px;">
+        <button class="mini-btn" onclick="speak('${safe}',0.55)">🐢 慢速</button>
+        <button class="mini-btn" onclick="speak('${safe}')">▶️ 正常</button>
+      </div>`;
+    bar.appendChild(row);
+    setTimeout(()=>{getIpaPhrase(p.en).then(ipa=>{const ip=row.querySelector(".dipa");if(ip&&ipa)ip.textContent="/"+ipa+"/";});},150);
+  });
+  el.appendChild(bar);
+  const pEl=el.parentElement;
+  if(pEl){pEl.scrollTop=pEl.scrollHeight;}
+  else if(typeof box!=="undefined"&&box){box.scrollTop=box.scrollHeight;}
+}
+
+/* ================= AI ================= */
+async function sendToAnna(userText){
+  if(state.busy)return;
+  state.busy=true;
+  $("thinking").style.display="block";$("msgs").scrollTop=$("msgs").scrollHeight;
+  state.history.push({role:"user",content:userText});
+  const s=state.current;
+  const sys=`You are Anna, a warm, patient English tutor for a Chinese senior beginner (55+). Current scene: "${s.title}". Goal: ${s.goal}. You play the foreigner who ONLY speaks English. The learner is the Chinese host/service person. Speak slowly, very simple English (CEFR A1).
+The learner already saw this opening: the foreigner said "${s.open[0]}" (${s.open[1]}). Remember it; never contradict or re-ask info already given.
+Reply in EXACTLY this 4-part format, plain text, no markdown:
+<In-character English reply, max 2 very short sentences, then one tiny question. If the learner asks for help in Chinese, this part is instead a direct Chinese answer from the teacher prefixed 【老师解答】>
+🇨🇳 <逐句翻译成中文>
+💡 怎么答: <用中文给思路，然后必须给出一句完整参考回答，格式固定：你可以说: "完整英文句子"（中文翻译）。参考回答必须顺着对方刚说的话往下接，绝不重复问对方已说过的信息。>
+🎓 跟我读: <先一句中文引导，再用 || 分隔 2-3 个要跟读的小段，每段格式固定：英文|中文|中文谐音。每段不超过 6 个单词。谐音用中文字模拟发音，如 hop in → 哈普·因。没有谐音和中文是不合格的>
+Rules: never scold; if learner makes a mistake, say the better way gently in 💡 as "更地道的说法". Be encouraging like a kind old friend. After 5-7 good turns congratulate and say this scene is completed. Always output all 4 parts.`;
+  const key=(state.key||"").trim();
+  let reply=null;
+  if(key){
+    try{
+      const res=await fetch("https://api.deepseek.com/chat/completions",{
+        method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+        body:JSON.stringify({model:"deepseek-chat",messages:[{role:"system",content:sys},...state.history.slice(-12)],temperature:0.6,max_tokens:1500})
+      });
+      if(res.ok){
+        reply=((await res.json()).choices[0].message.content||"").trim();
+        if(!reply){
+          const r2=await fetch("https://api.deepseek.com/chat/completions",{
+            method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+            body:JSON.stringify({model:"deepseek-chat",messages:[{role:"system",content:sys+"\nIMPORTANT: output the 4-part reply directly."},...state.history.slice(-12)],temperature:0.6,max_tokens:1500})
+          });
+          if(r2.ok)reply=((await r2.json()).choices[0].message.content||"").trim();
+        }
+      }else{
+        let msg="";try{const e=await res.json();msg=e.message||"";}catch(e){}
+        reply="【老师解答】连接 AI 失败了（"+(res.status===401?"密钥无效":res.status===402?"余额不足":"网络错误")+"）。您可以先点上面的常用句练习，或在设置里检查密钥。";
+      }
+    }catch(e){reply=null;}
+  }
+  if(!reply)reply=demoReply();
+  state.history.push({role:"assistant",content:reply});
+  addAiMsg(reply);
+  state.busy=false;
+}
+function demoReply(){
+  const turn=state.history.filter(h=>h.role==="user").length;
+  const demo=`Good job! Thank you! Can I ask one more thing?
+🇨🇳 说得好！谢谢！我能再问一件事吗？
+💡 怎么答: 夸夸对方再问下一句。你可以说: "Sure, no problem. What is it?"（当然，没问题，什么事？）
+🎓 跟我读: 学会这几种接话，跟我读 || Sure, no problem|当然，没问题|绍·诺·普罗布勒姆 || What is it?|什么事？|沃特·伊兹·伊特`;
+  return turn%2===0?demo:`You speak very well! This scene is complete. Congratulations!
+🇨🇳 您说得很好！这个情景完成了，恭喜！
+💡 怎么答: 结束时礼貌道别。你可以说: "Thank you! Have a nice day!"（谢谢，祝您愉快！）
+🎓 跟我读: 道别金句，跟我读 || Thank you! Have a nice day!|谢谢，祝您愉快！|三克尤·哈夫·厄·奈斯·戴`;
+}
+function sendText(){
+  const t=$("typeInput").value.trim();
+  if(!t)return;$("typeInput").value="";
+  addMsg("user",t,"");sendToAnna(t);
+}
+
+/* ================= 按住说话（讯飞 IAT 听写 + 浏览器SR兜底） ================= */
+let _rec=null,_recStream=null,_recChunks=[],_recStart=0,_holding=false;
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+function micDown(){
+  if(_holding)return;_holding=true;
+  $("micBtn").classList.add("holding");$("micBtn").textContent="🔴 正在听…请说话，说完松手";
+  $("confirmBox").style.display="none";
+  // 优先浏览器原生识别（识别快、自动断句）
+  if(SR){
+    try{
+      _rec=new SR();_rec.lang="en-US";_rec.interimResults=false;_rec.maxAlternatives=1;
+      _rec.onresult=e=>{const t=e.results[0][0].transcript;showConfirm(t);};
+      _rec.onerror=e=>{
+        _rec=null;
+        if(e.error==="no-speech")toast("没听到声音，再试一次吧 🎤");
+        else toast("语音识别暂时用不了（"+e.error+"）。\n\n可以改用下面的输入框：点一下，用键盘上的 🎤 语音输入");
+      };
+      _rec.onend=()=>{if(_holding){_holding=false;$("micBtn").classList.remove("holding");$("micBtn").textContent="🎤 按住说话（说英语）";}};
+      _rec.start();_recStart=Date.now();
+      return;
+    }catch(e){/* 掉到 IAT */}
+  }
+  iatDown();
+}
+let _recBroken=false;
+function micUp(){
+  if(!_holding)return;_holding=false;
+  $("micBtn").classList.remove("holding");$("micBtn").textContent="🎤 按住说话（说英语）";
+  const held=Date.now()-_recStart;
+  if(SR&&_rec){ setTimeout(()=>{try{_rec&&_rec.stop();}catch(e){}},held<700?700-held:0); return; }
+  stopIat();
+}
+function toast(msg){alert(msg);}
+/* —— 讯飞 IAT：按住期间持续录音，松手后识别 —— */
+let _iatWs=null,_iac=null;
+async function iatDown(){
+  try{
+    _recStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+    if(!_holding){stopStream();return;}
+    _iac=new (window.AudioContext||window.webkitAudioContext)();
+    await _iac.resume();
+    const src=_iac.createMediaStreamSource(_recStream);
+    const proc=_iac.createScriptProcessor(4096,1,1);
+    const chunks=[];
+    proc.onaudioprocess=e=>{if(_holding)chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));};
+    src.connect(proc);proc.connect(_iac.destination);
+    window._iatProc=proc;window._iatSrc=src;window._iatChunks=chunks;
+  }catch(e){
+    toast("打开麦克风失败了。\n\n解决办法：\n① 允许本页面使用麦克风\n② 或用下面的输入框，点一下用键盘上的 🎤 语音");
+    micReset();
+  }
+}
+function stopStream(){
+  try{window._iatProc&&window._iatProc.disconnect();}catch(e){}
+  try{window._iatSrc&&window._iatSrc.disconnect();}catch(e){}
+  try{_recStream&&_recStream.getTracks().forEach(t=>t.stop());}catch(e){}
+  try{_iac&&_iac.close();}catch(e){}
+  _recStream=null;_iac=null;
+}
+function stopIat(){
+  if(_iatWs){try{_iatWs.close();}catch(e){}_iatWs=null;}
+  stopStream();
+}
+function micReset(){$("micBtn").classList.remove("holding");$("micBtn").textContent="🎤 按住说话（说英语）";}
+function micCancel(){
+  if(SR&&_rec){try{_rec.onresult=null;_rec.onend=null;_rec.stop();}catch(e){}_rec=null;}
+  stopIat();_holding=false;micReset();
+}
+function iatRecognize(chunks,sr){
+  return new Promise((resolve,reject)=>{
+    // 合并+重采样 16k
+    const total=chunks.reduce((a,c)=>a+c.length,0);
+    if(total<sr*0.4)return reject(new Error("太短"));
+    const all=new Float32Array(total);let o=0;
+    for(const c of chunks){all.set(c,o);o+=c.length;}
+    let f32=all;
+    if(sr!==16000){
+      const n=Math.round(total*16000/sr),out=new Float32Array(n);
+      for(let i=0;i<n;i++){const t=i*(sr/16000);const i0=Math.min(Math.floor(t),total-1),i1=Math.min(i0+1,total-1);out[i]=all[i0]+(all[i1]-all[i0])*(t-i0);}
+      f32=out;
+    }
+    const pcm=new Int16Array(f32.length);
+    for(let i=0;i<f32.length;i++){const s=Math.max(-1,Math.min(1,f32[i]));pcm[i]=s<0?s*0x8000:s*0x7fff;}
+    // 签名
+    const HOST="iat-api.xfyun.cn",PATH="/v2/asm";
+    const date=new Date().toUTCString();
+    const origin=`host: ${HOST}\ndate: ${date}\nGET ${PATH} HTTP/1.1`;
+    crypto.subtle.importKey("raw",new TextEncoder().encode(state.xfSecret),{name:"HMAC",hash:"SHA-256"},false,["sign"]).then(k=>
+      crypto.subtle.sign("HMAC",k,new TextEncoder().encode(origin))
+    ).then(sigBuf=>{
+      const sig=new Uint8Array(sigBuf);
+      let sigs="";sig.forEach(b=>sigs+=String.fromCharCode(b));
+      const auth=btoa(`api_key="${state.xfKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${btoa(sigs)}"`);
+      const url=`wss://${HOST}${PATH}?authorization=${encodeURIComponent(auth)}&date=${encodeURIComponent(date)}&host=${HOST}`;
+      let ws;try{ws=new WebSocket(url);}catch(e){return reject(e);}
+      _iatWs=ws;ws.binaryType="arraybuffer";
+      const timer=setTimeout(()=>{try{ws.close();}catch(e){}reject(new Error("识别超时"));},25000);
+      let text="";let sentAll=false;
+      const b64e=bytes=>{let s="";const u=new Uint8Array(bytes);for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);};
+      ws.onopen=()=>{
+        ws.send(JSON.stringify({common:{app_id:state.xfAppid},business:{language:"en_us",domain:"iat",accent:"mandarin",vad_eos:10000,dwa:"wpgs"},data:{status:0,format:"audio/L16;rate=16000",encoding:"raw",audio:""}}));
+        const BYTES=1280;let off=0;
+        const iv=setInterval(()=>{
+          if(ws.readyState!==1){clearInterval(iv);return;}
+          if(off>=pcm.length*2){
+            if(!sentAll){sentAll=true;ws.send(JSON.stringify({business:{cmd:"auw",aus:4},data:{status:2,encoding:"raw",format:"audio/L16;rate=16000",audio:""}}));}
+            clearInterval(iv);return;
+          }
+          const end=Math.min(off+BYTES,pcm.length*2);
+          ws.send(JSON.stringify({business:{cmd:"auw",aus:2},data:{status:1,encoding:"raw",format:"audio/L16;rate=16000",audio:b64e(pcm.buffer.slice(off,end))}}));
+          off=end;
+        },40);
+      };
+      ws.onmessage=ev=>{
+        if(typeof ev.data!=="string")return;
+        const j=JSON.parse(ev.data);
+        if(j.code&&j.code!==0){clearTimeout(timer);try{ws.close();}catch(e){}reject(new Error("识别失败 "+j.code));return;}
+        if(j.data&&j.data.result){
+          const r=j.data.result;
+          if(r.ws)r.ws.forEach(w=>w.cw.forEach(c=>{text+=c.w;}));
+        }
+        if(j.data&&j.data.status===2){clearTimeout(timer);try{ws.close();}catch(e){}resolve(text.replace(/\s+/g," ").trim());}
+      };
+      ws.onerror=()=>{clearTimeout(timer);reject(new Error("识别连接失败"));};
+      ws.onclose=()=>{clearInterval(0);};
+    }).catch(reject);
+  });
+}
+function showConfirm(text){
+  if(!text){toast("没听清您说的话，再试一次吧 🎤");return;}
+  $("confirmTxt").textContent=text;
+  $("confirmBox").style.display="block";
+  $("okBtn").onclick=()=>{
+    $("confirmBox").style.display="none";
+    addMsg("user",text,"");sendToAnna(text);
+  };
+  $("retryBtn").onclick=()=>{$("confirmBox").style.display="none";toast("好，再按住麦克风说一次");};
+}
+/* 按住/松开事件（兼容手机触摸和鼠标） */
+(function(){
+  const b=$("micBtn");
+  b.addEventListener("touchstart",e=>{e.preventDefault();micDown();},{passive:false});
+  b.addEventListener("touchend",e=>{e.preventDefault();micUp();},{passive:false});
+  b.addEventListener("touchcancel",()=>micCancel());
+  b.addEventListener("mousedown",e=>{e.preventDefault();micDown();});
+  b.addEventListener("mouseup",e=>{e.preventDefault();micUp();});
+  b.addEventListener("mouseleave",()=>{if(_holding)micCancel();});
+})();
+
+/* ================= 炫耀卡 ================= */
+let _cardText="";
+function showShareCard(){
+  const who=state.nick||"我";
+  const pool=[];SCENES.forEach(s=>s.sentences.forEach(t=>pool.push(t)));
+  const h=hashDay();
+  const picks=[pool[h%pool.length],pool[(h*7+3)%pool.length],pool[(h*13+11)%pool.length]];
+  _cardText=`🌸 我在「小银英语」坚持学英语啦！\n今天学会了 ${picks.length} 句常用英语：\n`+picks.map((t,i)=>`${i+1}. ${t[0]}（${t[1]}）`).join("\n")+`\n岁数不是问题，敢开口就是进步！💪`;
+  $("shareCard").innerHTML=`<h2>🌸 打卡成功！</h2>
+    <div class="who">${escapeHtml(who)} · ${todayStr()}</div>
+    <div class="lines">${picks.map(t=>`<div class="en">${escapeHtml(t[0])}</div><div class="cn">🇨🇳 ${escapeHtml(t[1])}</div>`).join("")}</div>
+    <div style="margin-top:14px;font-size:16px;color:var(--green);font-weight:700;">敢开口，就是进步！💪</div>`;
+  $("homePage").style.display="none";$("chatPage").style.display="none";
+  $("cardPage").style.display="block";
+  window.scrollTo(0,0);
+}
+function copyCard(){
+  const done=()=>alert("已复制！去微信粘贴发给家人吧 😊");
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(_cardText).then(done).catch(()=>fallbackCopy(done));}
+  else fallbackCopy(done);
+}
+function fallbackCopy(done){
+  const ta=document.createElement("textarea");ta.value=_cardText;document.body.appendChild(ta);
+  ta.select();try{document.execCommand("copy");done();}catch(e){alert("复制失败，请手动截图分享");}document.body.removeChild(ta);
+}
+
+/* ================= 设置 ================= */
+function openSettings(){
+  $("nickInput").value=state.nick;
+  $("keyInput").value=state.key;
+  document.querySelectorAll(".rate-btn").forEach(b=>b.classList.toggle("on",b.dataset.rate===state.rate));
+  $("settingsModal").style.display="flex";
+}
+function setRate(r){state.rate=r;document.querySelectorAll(".rate-btn").forEach(b=>b.classList.toggle("on",b.dataset.rate===r));save();speak("Hello! Nice to meet you!");}
+function saveSettings(){
+  state.nick=$("nickInput").value.trim().slice(0,10);
+  state.key=$("keyInput").value.trim();
+  save();$("settingsModal").style.display="none";renderHome();
+}
+
+/* ================= 启动 ================= */
+renderHome();
+</script>
+</body>
+</html>
