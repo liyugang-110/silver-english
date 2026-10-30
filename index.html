@@ -45,7 +45,8 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
 /* 对话页 */
 #chatPage{display:none;flex-direction:column;height:100dvh;max-width:520px;margin:0 auto;}
 #chatHead{background:linear-gradient(135deg,#e0553a,#d97706);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
-#chatHead button{background:rgba(255,255,255,.2);border:none;color:#fff;font-size:17px;padding:6px 12px;border-radius:10px;}
+#chatHead button{background:rgba(255,255,255,.2);border:none;color:#fff;font-size:17px;padding:6px 12px;border-radius:10px;white-space:nowrap;flex-shrink:0;}
+#chatHead>div{min-width:0;}
 #msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}
 .msg{max-width:92%;padding:12px 14px;border-radius:16px;font-size:19px;line-height:1.5;}
 .msg.ai{background:var(--card);border:2px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px;}
@@ -561,7 +562,12 @@ async function getIpaPhrase(text){
   const words=(String(text||"").match(/[A-Za-z']+/g))||[];
   if(!words.length)return "";
   const ipas=await Promise.all(words.map(w=>getIpa(w)));
-  const r=words.map((w,i)=>(ipas[i]||"").trim()||w.toLowerCase()).join(" ").trim();
+  /* 兜底修正：查不到音标的词直接跳过；整句有音标的词不足 6 成就返回空（隐藏音标行），
+     绝不把原句当音标显示（之前会出现 "/that's too expensive/" 这种假音标） */
+  const pairs=words.map((w,i)=>({w,ipa:(ipas[i]||"").trim()}));
+  const good=pairs.filter(p=>p.ipa);
+  if(good.length<Math.ceil(words.length*0.6)){_ipaPhraseCache[key]="";return "";}
+  const r=good.map(p=>p.ipa).join(" ").trim();
   _ipaPhraseCache[key]=r;return r;
 }
 
@@ -807,6 +813,14 @@ function finishToday(){
 }
 
 /* ================= 对话 ================= */
+/* 进入内页时压入一条历史记录：手机按返回键 = 回首页，而不是退出网页 */
+function pushView(){try{history.pushState({se:1},"","#view");}catch(e){}}
+window.addEventListener("popstate",()=>{
+  try{
+    const inner=$("chatPage").style.display==="flex"||$("cardPage").style.display==="block";
+    if(inner)goHome();
+  }catch(e){}
+});
 function goHome(){
   $("chatPage").style.display="none";$("cardPage").style.display="none";
   $("homePage").style.display="block";
@@ -814,13 +828,18 @@ function goHome(){
   try{stopIat();}catch(e){}
   renderHome();
   window.scrollTo(0,0);
+  if(location.hash==="#view"){try{history.back();}catch(e){}}
 }
 function startChat(s){
   state.current=s;state.history=[];
   $("homePage").style.display="none";$("cardPage").style.display="none";
   $("chatPage").style.display="flex";
+  pushView();
+  window.scrollTo(0,0);
   $("chatTitle").textContent="Anna · "+s.title;
   $("chatSub").textContent=s.chat?"小提示：说话声音小也没关系，Anna 会认真听":"小提示：点对方的话可以重听";
+  /* 麦克风标签跟随场景：聊天说中文，练英文场景说英语 */
+  $("micBtn").textContent=s.chat?"🎤 按住说话（说中文）":"🎤 按住说话（说英语）";
   // 微信内：提示麦克风受限时的出路
   if(/MicroMessenger/i.test(navigator.userAgent)&&!$("wxTip")){
     const tip=document.createElement("div");tip.id="wxTip";
@@ -1373,6 +1392,7 @@ function showShareCard(){
     <div style="margin-top:14px;font-size:16px;color:var(--green);font-weight:700;">敢开口，就是进步！💪</div>`;
   $("homePage").style.display="none";$("chatPage").style.display="none";
   $("cardPage").style.display="block";
+  pushView();
   window.scrollTo(0,0);
 }
 function copyCard(){
