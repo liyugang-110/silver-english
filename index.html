@@ -94,6 +94,8 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
     <div id="todayList"></div>
     <button id="doneToday" onclick="finishToday()">✅ 我都跟读过了，打卡！</button>
   </div>
+  <div class="sec-title" id="revSec" style="display:none">📖 读得不好的句子（再练一遍）</div>
+  <div id="reviewList"></div>
   <div class="sec-title">🗓️ 我的坚持</div>
   <div id="calRow"></div>
   <div class="sec-title">💬 想聊天？Anna 随时都在</div>
@@ -167,7 +169,13 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
 <div class="modal" id="settingsModal">
   <div class="box">
     <h3>⚙️ 设置</h3>
-    <div style="font-size:16px;margin-bottom:8px;font-weight:700;">🗣️ Anna 说话速度</div>
+    <div style="font-size:16px;margin:14px 0 8px;font-weight:700;">🔠 字体大小</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="mini-btn font-btn" data-f="" style="padding:10px 14px;" onclick="setFont('')">标准</button>
+      <button class="mini-btn font-btn" data-f="1" style="padding:10px 14px;" onclick="setFont('1')">大</button>
+      <button class="mini-btn font-btn" data-f="2" style="padding:10px 14px;" onclick="setFont('2')">特大</button>
+    </div>
+    <div style="font-size:16px;margin:14px 0 8px;font-weight:700;">🗣️ Anna 说话速度</div>
     <button class="rate-btn" data-rate="slow" onclick="setRate('slow')">🐢 慢慢说（第一次学推荐）</button>
     <button class="rate-btn" data-rate="mid" onclick="setRate('mid')">🐢 慢一点（默认）</button>
     <button class="rate-btn" data-rate="fast" onclick="setRate('fast')">▶️ 正常语速</button>
@@ -284,13 +292,14 @@ const state={
   gender:localStorage.getItem("se_gender")||"",
   rate:localStorage.getItem("se_rate")||"mid",
   key:localStorage.getItem("se_key")||(localStorage.getItem("anna_key")||""), // 自动继承旧版密钥
+  font:localStorage.getItem("se_font")||"",
   platform:localStorage.getItem("se_platform")||"zhipu", // zhipu=智谱GLM(免费) deepseek=DeepSeek(付费) spark=讯飞星火(免费)
   xfAppid:"ff8487eb",
   xfKey:"a072aa918cf53af7e2bc23f242d351f5",
   xfSecret:atob("TmpKbVpUUmxZbVkxTm1Ka1pERm1ORGcxTWpoalpqTmo="),
   history:[],current:null,busy:false
 };
-function save(){localStorage.setItem("se_nick",state.nick);localStorage.setItem("se_gender",state.gender);localStorage.setItem("se_rate",state.rate);localStorage.setItem("se_key",state.key);localStorage.setItem("se_platform",state.platform);}
+function save(){localStorage.setItem("se_nick",state.nick);localStorage.setItem("se_gender",state.gender);localStorage.setItem("se_rate",state.rate);localStorage.setItem("se_key",state.key);localStorage.setItem("se_platform",state.platform);localStorage.setItem("se_font",state.font||"");}
 function curRate(){return RATES[state.rate]||0.7;}
 
 /* ================= 朗读（复用多链路：浏览器→百度→有道→Edge神经） ================= */
@@ -675,6 +684,26 @@ function renderHome(){
     setTimeout(()=>speakCn(line),700);
   }
   localStorage.setItem("se_lastVisit",today);
+  // 复习列表
+  const rev=getReview();
+  const revSec=$("revSec"),revList=$("reviewList");
+  if(revSec){revSec.style.display=rev.length?"block":"none";}
+  if(revList){
+    revList.innerHTML="";
+    rev.forEach((r,i)=>{
+      const safe=r.en.replace(/'/g,"\\'");
+      const d=document.createElement("div");d.className="sen-row";
+      d.innerHTML=`<div class="en"><span onclick="speak('${safe}')" style="cursor:pointer">🔊</span> ${escapeHtml(r.en)}</div>
+        ${r.cn?`<div class="cn">🇨🇳 ${escapeHtml(r.cn)}</div>`:""}
+        ${r.hy?`<div class="hy">🗣️ 谐音：${escapeHtml(r.hy)}</div>`:""}
+        <div class="ipa" id="ripa${i}"></div>
+        <div class="btns"><button class="mini-btn" onclick="speak('${safe}',0.55)">🐢 慢速</button>
+        <button class="mini-btn" onclick="speak('${safe}')">▶️ 正常</button>
+        <button class="mini-btn org" onclick="repeatGo(this,'${safe}')">🎤 跟读</button></div>`;
+      revList.appendChild(d);
+      setTimeout(()=>{getIpaPhrase(r.en).then(ipa=>{const el=$("ripa"+i);if(el&&ipa)el.textContent="/"+ipa+"/";});},400+i*100);
+    });
+  }
   // 今日 3 句
   const pool=[];SCENES.forEach(s=>s.sentences.forEach(t=>pool.push({scene:s,t})));
   const h=hashDay();
@@ -893,6 +922,34 @@ function attachDrill(el,raw){
 /* ================= 跟读（自动录音→识别→鼓励式比对） ================= */
 let _repBusy=false;
 function normEn(s){return String(s||"").toLowerCase().replace(/[^a-z0-9' ]/g," ").split(/\s+/).filter(Boolean);}
+/* 逐词对照：命中=绿，近音/半对=橙，漏读=灰删除线 */
+function wordMark(target,heard){
+  const T=normEn(target),H=normEn(heard||"");
+  if(!T.length)return "";
+  return T.map(w=>{
+    if(H.indexOf(w)>-1)return `<span style="color:var(--green);font-weight:700">${escapeHtml(w)}</span>`;
+    if(w.length>3&&H.some(h=>h.slice(0,4)===w.slice(0,4)))return `<span style="color:#b45309;font-weight:700">${escapeHtml(w)}</span>`;
+    return `<span style="color:#9ca3af;text-decoration:line-through">${escapeHtml(w)}</span>`;
+  }).join(" ");
+}
+/* 复习列表：读不好的自动收进来，读好了自动移出 */
+function getReview(){try{return JSON.parse(localStorage.getItem("se_review")||"[]");}catch(e){return [];}}
+function addReview(en){
+  const l=getReview().filter(x=>x.en!==en);
+  const sc=SCENES.flatMap(s=>s.sentences).find(t=>t[0]===en);
+  l.unshift({en,cn:sc?sc[1]:"",hy:sc?sc[2]:""});
+  try{localStorage.setItem("se_review",JSON.stringify(l.slice(0,20)));}catch(e){}
+}
+function removeReview(en){
+  const l=getReview().filter(x=>x.en!==en);
+  try{localStorage.setItem("se_review",JSON.stringify(l));}catch(e){}
+}
+/* 字体大小三档 */
+function setFont(f){
+  state.font=f;save();
+  document.body.style.zoom=f==="2"?"1.28":(f==="1"?"1.12":"");
+  document.querySelectorAll(".font-btn").forEach(b=>b.style.outline=b.dataset.f===f?"3px solid #f59e0b":"");
+}
 function compareSay(target,heard){
   const T=normEn(target),H=normEn(heard);
   if(!T.length||!H.length)return 0;
@@ -906,9 +963,10 @@ function compareSay(target,heard){
 function _judgeRepeat(res,btn,target,heard){
   const score=compareSay(target,heard||"");
   res.style.display="block";
-  if(score>=60){res.style.color="var(--green)";res.innerHTML=pickRnd(REP_GOOD);if(Math.random()<0.4)speakCn(pickRnd(["好！就这样！","不错哟！","说得挺好！"]));}
-  else if(score>=30){res.style.color="#b45309";res.innerHTML=pickRnd(REP_NEAR)+escapeHtml(heard||"");}
-  else{res.style.color="var(--muted)";res.innerHTML=pickRnd(REP_MISS);}
+  const marks=`<div style="margin-top:6px;font-size:17px;letter-spacing:.5px">📖 逐词对照：${wordMark(target,heard)}</div>`;
+  if(score>=60){res.style.color="var(--green)";res.innerHTML=pickRnd(REP_GOOD)+marks;if(Math.random()<0.4)speakCn(pickRnd(["好！就这样！","不错哟！","说得挺好！"]));removeReview(target);}
+  else if(score>=30){res.style.color="#b45309";res.innerHTML=pickRnd(REP_NEAR)+escapeHtml(heard||"")+marks;addReview(target);}
+  else{res.style.color="var(--muted)";res.innerHTML=pickRnd(REP_MISS)+marks;addReview(target);}
 }
 function repeatGo(btn,target){
   if(_repBusy){notice("正在听您读呢，稍等一下～");return;}
@@ -1291,6 +1349,7 @@ function pfSync(){
 function openSettings(){
   $("nickInput").value=state.nick;
   $("keyInput").value=state.key;
+  document.querySelectorAll(".font-btn").forEach(b=>b.style.outline=b.dataset.f===state.font?"3px solid #f59e0b":"");
   $("gF").classList.toggle("org",state.gender!=="m");
   $("gM").classList.toggle("org",state.gender==="m");
   document.querySelectorAll(".rate-btn").forEach(b=>b.classList.toggle("on",b.dataset.rate===state.rate));
@@ -1308,6 +1367,7 @@ function saveSettings(){
 
 /* ================= 启动 ================= */
 renderHome();
+try{setFont(state.font||"");}catch(e){}
 if(!state.nick){
   $("welcomeModal").style.display="flex";
   // 自动播欢迎语：微信里 JSBridge 就绪即播；其他浏览器在用户首次触摸后播
