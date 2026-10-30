@@ -627,7 +627,7 @@ function welMicDown(){
 function welMicUp(){
   if(!_welHolding)return;_welHolding=false;_holding=false;
   $("welMic").classList.remove("holding");$("welMic").textContent="🎤 按住说话（说中文）";
-  if(_wrec){const r=_wrec;_wrec=null;$("welResult").textContent="正在听懂您的话…";setTimeout(()=>{try{r.stop();}catch(e){}},400);return;}
+  if(_wrec){const r=_wrec;_wrec=null;$("welResult").textContent="正在听懂您的话…";setTimeout(()=>{try{r.stop();}catch(e){}},400);stopStream();return;}
   const chunks=(window._iatChunks||[]).slice();
   const sr=_iac?_iac.sampleRate:16000;
   stopStream();
@@ -1245,7 +1245,7 @@ function micUp(){
   if(!_holding)return;_holding=false;
   micReset();
   const held=Date.now()-_recStart;
-  if(SR&&_rec){ setTimeout(()=>{try{_rec&&_rec.stop();}catch(e){}},held<700?700-held:0); return; }
+  if(SR&&_rec){ setTimeout(()=>{try{_rec&&_rec.stop();}catch(e){}},held<700?700-held:0); stopStream(); return; }
   /* IAT 路径：松手后把录到的音频送去识别 */
   const chunks=(window._iatChunks||[]).slice();
   const sr=_iac?_iac.sampleRate:16000;
@@ -1304,6 +1304,9 @@ function stopIat(){
   if(_iatWs){try{_iatWs.close();}catch(e){}_iatWs=null;}
   stopStream();
 }
+/* 页面切后台/关闭：强制释放麦克风，不留系统占用图标 */
+document.addEventListener("visibilitychange",()=>{if(document.hidden){try{micCancel();}catch(e){}try{_wrec&&_wrec.stop();}catch(e){}_wrec=null;try{stopStream();}catch(e){}}});
+window.addEventListener("pagehide",()=>{try{micCancel();}catch(e){}try{stopStream();}catch(e){}});
 function micReset(){$("micBtn").classList.remove("holding");$("micBtn").textContent=chatMode()?"🎤 按住说话（说中文）":"🎤 按住说话（说英语）";}
 function micCancel(){
   if(SR&&_rec){try{_rec.onresult=null;_rec.onend=null;_rec.stop();}catch(e){}_rec=null;}
