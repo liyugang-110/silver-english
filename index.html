@@ -94,6 +94,9 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
     <div id="todayList"></div>
     <button id="doneToday" onclick="finishToday()">✅ 我都跟读过了，打卡！</button>
   </div>
+  <div class="sec-title">🎤 跟读练习（48 句 · 点分类展开）</div>
+  <div id="drillCats"></div>
+  <div id="drillList"></div>
   <div class="sec-title" id="revSec" style="display:none">📖 读得不好的句子（再练一遍）</div>
   <div id="reviewList"></div>
   <div class="sec-title">🗓️ 我的坚持</div>
@@ -168,6 +171,8 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
 <div class="modal" id="settingsModal">
   <div class="box">
     <h3>⚙️ 设置</h3>
+    <div style="font-size:16px;margin:14px 0 8px;font-weight:700;">🧹 学习记录</div>
+    <button class="mini-btn" style="width:100%;padding:12px;" onclick="clearRecords()">清空打卡/学会句数/复习列表（称呼保留）</button>
     <div style="font-size:16px;margin:14px 0 8px;font-weight:700;">🔠 字体大小</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">
       <button class="mini-btn font-btn" data-f="" style="padding:10px 14px;" onclick="setFont('')">标准</button>
@@ -296,6 +301,17 @@ const SCENES=[
 ];
 
 /* ================= 状态 ================= */
+/* ===== 跟读练习题库：8 类 × 6 句 = 48 句 ===== */
+const DRILLS=[
+{cat:"👋 打招呼",items:[["Hello! How are you?","你好！你好吗？","哈喽！豪·阿·尤？"],["Nice to meet you.","很高兴认识你。","奈斯·图·米特·尤。"],["Good morning!","早上好！","古德·莫宁！"],["Long time no see.","好久不见。","朗·泰姆·诺·西。"],["See you tomorrow.","明天见。","西·尤·图莫柔。"],["Have a nice day!","祝您愉快！","哈夫·厄·奈斯·戴！"]]},
+{cat:"🛒 买东西",items:[["How much is it?","这个多少钱？","豪·马奇·伊兹·伊特？"],["That's too expensive.","太贵了。","扎茨·图·伊克斯潘西夫。"],["Can it be cheaper?","能便宜点吗？","坎·伊特·比·奇普尔？"],["I'll take it.","我买了。","艾尔·忒克·伊特。"],["Do you have a bigger one?","有大一号的吗？","杜·尤·哈夫·厄·比格·万？"],["Just looking, thank you.","随便看看，谢谢。","扎斯特·卢肯，三克尤。"]]},
+{cat:"🏥 看病买药",items:[["I have a headache.","我头疼。","艾·哈夫·厄·海德克。"],["I feel sick.","我不舒服。","艾·菲尔·西克。"],["I need some medicine.","我需要买药。","艾·尼德·萨姆·梅德辛。"],["Take it twice a day.","一天吃两次。","忒克·伊特·图瓦斯·厄·戴。"],["Where is the hospital?","医院在哪儿？","维尔·伊兹·迪·霍斯皮特尔？"],["I am better now, thank you.","我好多了，谢谢。","艾·阿姆·贝特·脑，三克尤。"]]},
+{cat:"🚌 问路坐车",items:[["Where is the bus stop?","公交车站在哪儿？","维尔·伊兹·迪·巴斯·斯托普？"],["Is it far from here?","离这儿远吗？","伊兹·伊特·法·夫罗姆·希尔？"],["Turn left at the corner.","到路口左转。","特恩·莱夫特·阿特·迪·科纳。"],["One ticket, please.","一张票，谢谢。","万·忒克特，普利兹。"],["Does this bus go downtown?","这车去市中心吗？","达兹·迪斯·巴斯·够·当唐？"],["Stop here, please.","请在这儿停。","斯托普·希尔，普利兹。"]]},
+{cat:"🍜 餐厅点餐",items:[["A table for two, please.","两位，谢谢。","厄·忒布尔·佛·图，普利兹。"],["What do you recommend?","您推荐什么？","沃特·杜·尤·瑞康门德？"],["Not too spicy, please.","不要太辣，谢谢。","诺特·图·斯派西，普利兹。"],["It is delicious!","太好吃了！","伊特·伊兹·迪利舍斯！"],["The bill, please.","买单，谢谢。","迪·比尔，普利兹。"],["A cup of tea, please.","一杯茶，谢谢。","厄·卡普·奥夫·提，普利兹。"]]},
+{cat:"📞 打电话",items:[["Hello, this is Li Ming.","喂，我是李明。","哈喽，迪斯·伊兹·李·明。"],["May I speak to Mr. Wang?","王先生在吗？","梅·艾·斯皮克·图·米斯特·王？"],["Hold on, please.","请稍等。","霍尔得·昂，普利兹。"],["Can I take a message?","要我带个话吗？","坎·艾·忒克·厄·梅塞奇？"],["I will call you back.","我回头打给您。","艾·维尔·科尔·尤·巴克。"],["Sorry, wrong number.","抱歉，打错了。","索瑞，荣·南波。"]]},
+{cat:"👨‍👩‍👧 家人聊天",items:[["How was your day?","今天过得怎么样？","豪·沃兹·尤尔·戴？"],["I miss you so much.","我特别想您。","艾·米斯·尤·索·马奇。"],["Dinner is ready!","吃饭啦！","迪纳·伊兹·瑞迪！"],["Take care of yourself.","照顾好自己。","忒克·凯尔·奥夫·尤尔塞夫。"],["Happy birthday to you!","祝您生日快乐！","哈皮·伯斯戴·图·尤！"],["Let's take a photo!","来拍张照吧！","莱茨·忒克·厄·福图！"]]},
+{cat:"✈️ 出门旅游",items:[["Where is my hotel?","我的酒店在哪儿？","维尔·伊兹·迈·霍特尔？"],["I have a reservation.","我有预订。","艾·哈夫·厄·瑞泽维申。"],["What a beautiful view!","风景真美！","沃特·厄·比尤提弗·维尤！"],["How long does it take?","要多长时间？","豪·朗·达兹·伊特·忒克？"],["Can you take a photo for us?","能帮我们拍张照吗？","坎·尤·忒克·厄·福图·佛·阿斯？"],["Have a nice trip!","祝旅途愉快！","哈夫·厄·奈斯·特里普！"]]}
+];
 const RATES={slow:0.55,mid:0.7,fast:0.85};
 const state={
   nick:localStorage.getItem("se_nick")||"",
@@ -707,6 +723,36 @@ function renderHome(){
     setTimeout(()=>speakCn(line),700);
   }
   localStorage.setItem("se_lastVisit",today);
+  // 跟读练习 48 句
+  const dc=$("drillCats");
+  if(dc&&!dc.dataset.built){
+    dc.dataset.built="1";
+    DRILLS.forEach((d,i)=>{
+      const b=document.createElement("button");
+      b.className="mini-btn";b.style.cssText="margin:4px 6px 4px 0;padding:12px 14px;font-size:17px;";
+      b.textContent=d.cat+" ▸";
+      b.onclick=()=>{
+        document.querySelectorAll("#drillCats .mini-btn").forEach(x=>x.style.outline="");
+        b.style.outline="3px solid var(--primary)";
+        const dl=$("drillList");dl.innerHTML="";
+        d.items.forEach((t,j)=>{
+          const safe=t[0].replace(/'/g,"\\'");
+          const row=document.createElement("div");row.className="sen-row";
+          row.innerHTML=`<div class="en"><span onclick="speak('${safe}')" style="cursor:pointer">🔊</span> ${escapeHtml(t[0])}</div>
+            <div class="cn">🇨🇳 ${escapeHtml(t[1])}</div>
+            <div class="hy">🗣️ 谐音：${escapeHtml(t[2])}</div>
+            <div class="ipa" id="dipa${i}_${j}"></div>
+            <div class="btns"><button class="mini-btn" onclick="speak('${safe}',0.55)">🐢 慢速</button>
+            <button class="mini-btn" onclick="speak('${safe}')">▶️ 正常</button>
+            <button class="mini-btn org" onclick="repeatGo(this,'${safe}')">🎤 跟读</button></div>`;
+          dl.appendChild(row);
+          setTimeout(()=>{getIpaPhrase(t[0]).then(ipa=>{const el=$("dipa"+i+"_"+j);if(el&&ipa)el.textContent="/"+ipa+"/";});},300+j*120);
+        });
+        dl.scrollIntoView({behavior:"smooth",block:"start"});
+      };
+      dc.appendChild(b);
+    });
+  }
   // 复习列表
   const rev=getReview();
   const revSec=$("revSec"),revList=$("reviewList");
@@ -759,6 +805,22 @@ function renderHome(){
   });
   renderCal();
 }
+/* 累计学会句数：跟读达标即计入（同一句只算一次） */
+function bumpLearned(target){
+  try{
+    const o=JSON.parse(localStorage.getItem("se_learned")||"{}");
+    o[target]=1;
+    localStorage.setItem("se_learned",JSON.stringify(o));
+    const el=$("calLine");
+    if(el)el.textContent=learnedLine();
+  }catch(e){}
+}
+function learnedLine(){
+  let d=0,m=0;
+  try{d=Object.keys(JSON.parse(localStorage.getItem("se_check")||"{}")).length;}catch(e){}
+  try{m=Object.keys(JSON.parse(localStorage.getItem("se_learned")||"{}")).length;}catch(e){}
+  return {d,m};
+}
 function renderCal(){
   const row=$("calRow");row.innerHTML="";
   const checks={};try{checks=JSON.parse(localStorage.getItem("se_check")||"{}");}catch(e){}
@@ -772,8 +834,9 @@ function renderCal(){
     row.appendChild(div);
   });
   const n=Object.keys(checks).length;
+  let m=0;try{m=Object.keys(JSON.parse(localStorage.getItem("se_learned")||"{}")).length;}catch(e){}
   const t=document.createElement("div");t.style.cssText="width:100%;font-size:15px;color:var(--muted);margin-top:4px;";
-  t.textContent=n?`已经坚持 ${n} 天啦，真棒！👍`:"今天打第一个卡吧！";
+  t.textContent=`🌸 已坚持 ${n} 天 · 📚 累计学会 ${m} 句`+(n?"，真棒！👍":"");
   row.appendChild(t);
 }
 function finishToday(){
@@ -968,6 +1031,11 @@ function removeReview(en){
   try{localStorage.setItem("se_review",JSON.stringify(l));}catch(e){}
 }
 /* 字体大小三档 */
+function clearRecords(){
+  if(!confirm("确定清空学习记录吗？（打卡天数、学会句数、复习列表将被清空，称呼保留）"))return;
+  localStorage.removeItem("se_check");localStorage.removeItem("se_learned");localStorage.removeItem("se_review");
+  renderHome();renderCal();toast("已清空学习记录，咱们重新开始 💪");
+}
 function setFont(f){
   state.font=f;save();
   document.body.style.zoom=f==="2"?"1.28":(f==="1"?"1.12":"");
@@ -987,7 +1055,7 @@ function _judgeRepeat(res,btn,target,heard){
   const score=compareSay(target,heard||"");
   res.style.display="block";
   const marks=`<div style="margin-top:6px;font-size:17px;letter-spacing:.5px">📖 逐词对照：${wordMark(target,heard)}</div>`;
-  if(score>=60){res.style.color="var(--green)";res.innerHTML=pickRnd(REP_GOOD)+marks;if(Math.random()<0.4)speakCn(pickRnd(["好！就这样！","不错哟！","说得挺好！"]));removeReview(target);}
+  if(score>=60){res.style.color="var(--green)";res.innerHTML=pickRnd(REP_GOOD)+marks;if(Math.random()<0.4)speakCn(pickRnd(["好！就这样！","不错哟！","说得挺好！"]));removeReview(target);bumpLearned(target);}
   else if(score>=30){res.style.color="#b45309";res.innerHTML=pickRnd(REP_NEAR)+escapeHtml(heard||"")+marks;addReview(target);}
   else{res.style.color="var(--muted)";res.innerHTML=pickRnd(REP_MISS)+marks;addReview(target);}
 }
