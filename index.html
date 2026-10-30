@@ -587,7 +587,7 @@ function welMicDown(){
       const rec=new SR();rec.lang="zh-CN";rec.interimResults=false;rec.maxAlternatives=1;
       _wrec=rec;
       rec.onresult=e=>{welHandleText(e.results[0][0].transcript);};
-      rec.onerror=e=>{if(e.error!=="aborted")_srBroken=true;};
+      rec.onerror=e=>{const er=e.error||"";if(er==="not-allowed"||er==="service-not-allowed")_srBroken=true;};
       rec.onend=()=>{_wrec=null;};
       rec.start();
       return;
@@ -994,8 +994,10 @@ function repeatGo(btn,target){
         _rec=rec;
         rec.onresult=e=>{_judgeRepeat(res,btn,target,e.results[0][0].transcript);};
         rec.onerror=e=>{
-          if(e.error==="not-allowed"){_srBroken=true;res.textContent="🎤 麦克风没允许，请在弹窗点允许后重试";}
-          else{_srBroken=true;res.textContent="原生识别不可用（"+e.error+"），正在换备用通道…";}
+          const er=e.error||"";
+          if(er==="not-allowed"||er==="service-not-allowed"){_srBroken=true;res.textContent="🎤 麦克风/识别引擎没允许，请点允许后重试";}
+          else if(er==="no-speech"||er==="aborted"){res.textContent="没听到声音～再点一次 🎤，大声读出来";}
+          else{res.textContent="这一回没听清（"+er+"），再点一次 🎤 试试";}
         };
         rec.onend=()=>{_rec=null;_repBusy=false;btn.disabled=false;btn.textContent="🎤 跟读";};
         try{rec.start();}catch(e){_srBroken=true;_repBusy=false;btn.disabled=false;btn.textContent="🎤 跟读";return pcmRepeat(btn,target,res);}
@@ -1044,7 +1046,7 @@ function pcmRepeat(btn,target,res){
     res.style.display="block";res.style.color="var(--muted)";
     const em=String(e&&e.message||e);
     if(em.indexOf("麦克风")>-1||em.indexOf("permission")>-1||em.indexOf("NotAllowed")>-1)res.textContent="🎤 麦克风没打开：请在手机弹窗里点“允许”，然后重试";
-    else if(em.indexOf("识别连接失败")>-1||em.indexOf("识别超时")>-1)res.textContent="语音识别服务连不上（"+em+"）。请检查网络后重试";
+    else if(em.indexOf("识别连接失败")>-1||em.indexOf("识别超时")>-1)res.textContent="识别服务连不上（"+em+"）。再点一次 🎤 试试，或稍后重试";
     else if(em.indexOf("识别失败")>-1)res.textContent="识别服务返回错误（"+em+"）。请截图发开发者";
     else res.textContent="没听清您读的，再来一次吧！要按住读完整个句子哦";
   }).finally(()=>{
