@@ -135,6 +135,30 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
   </div>
 </div>
 
+<div class="modal" id="welcomeModal" style="background:#fff;z-index:200;align-items:flex-start;overflow-y:auto;">
+  <div class="box" style="margin:30px auto;text-align:center;">
+    <div style="font-size:52px;">👵🧓</div>
+    <h3 style="font-size:24px;color:var(--primary);margin-top:8px;">您好啊！👋</h3>
+    <div style="font-size:19px;line-height:1.7;margin-top:8px;">我是您的英语老师 <b>Anna</b>。<br>我应该怎么称呼您呢？</div>
+    <button id="hearBtn" class="mini-btn org" style="margin:14px auto;display:block;padding:12px 24px;font-size:18px;" onclick="welHello()">🔊 点这里，听 Anna 说</button>
+    <div id="welStep2" class="hidden">
+      <div style="font-size:18px;margin:12px 0 6px;">按住下面的按钮，告诉我：<br><b>“我姓李”“我姓王”</b> 就可以啦</div>
+      <button id="welMic" style="width:100%;border:none;border-radius:16px;padding:20px;font-size:20px;font-weight:700;background:var(--primary);color:#fff;">🎤 按住说话（说中文）</button>
+      <div id="welResult" style="font-size:17px;margin-top:10px;color:var(--muted);"></div>
+    </div>
+    <div style="margin-top:16px;border-top:2px dashed var(--line);padding-top:14px;">
+      <div style="font-size:15px;color:var(--muted);">不方便说话？手动填：</div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input id="welInput" placeholder="您的姓氏，如：李" style="flex:1;border:2px solid var(--line);border-radius:12px;padding:10px;font-size:18px;">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="mini-btn" style="flex:1;" onclick="welManual('f')">👩 我是女的（称阿姨）</button>
+        <button class="mini-btn" style="flex:1;" onclick="welManual('m')">👨 我是男的（称叔叔）</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="settingsModal">
   <div class="box">
     <h3>⚙️ 设置</h3>
@@ -143,7 +167,11 @@ main{max-width:520px;margin:0 auto;padding:14px 14px 30px;}
     <button class="rate-btn" data-rate="mid" onclick="setRate('mid')">🐢 慢一点（默认）</button>
     <button class="rate-btn" data-rate="fast" onclick="setRate('fast')">▶️ 正常语速</button>
     <div style="font-size:16px;margin:14px 0 8px;font-weight:700;">👋 Anna 怎么称呼您</div>
-    <input id="nickInput" placeholder="比如：李阿姨" style="width:100%;border:2px solid var(--line);border-radius:12px;padding:12px;font-size:18px;">
+    <input id="nickInput" placeholder="您的姓氏，比如：李" style="width:100%;border:2px solid var(--line);border-radius:12px;padding:12px;font-size:18px;">
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="mini-btn" id="gF" style="flex:1;padding:12px;" onclick="setGender('f')">👩 称阿姨</button>
+      <button class="mini-btn" id="gM" style="flex:1;padding:12px;" onclick="setGender('m')">👨 称叔叔</button>
+    </div>
     <div style="margin-top:14px;">
       <button class="mini-btn org" style="width:100%;padding:14px;font-size:18px;" onclick="saveSettings()">保存</button>
     </div>
@@ -199,6 +227,7 @@ const SCENES=[
 const RATES={slow:0.55,mid:0.7,fast:0.85};
 const state={
   nick:localStorage.getItem("se_nick")||"",
+  gender:localStorage.getItem("se_gender")||"",
   rate:localStorage.getItem("se_rate")||"mid",
   key:localStorage.getItem("se_key")||(localStorage.getItem("anna_key")||""), // 自动继承旧版密钥
   xfAppid:"ff8487eb",
@@ -206,15 +235,41 @@ const state={
   xfSecret:atob("TmpKbVpUUmxZbVkxTm1Ka1pERm1ORGcxTWpoalpqTmo="),
   history:[],current:null,busy:false
 };
-function save(){localStorage.setItem("se_nick",state.nick);localStorage.setItem("se_rate",state.rate);localStorage.setItem("se_key",state.key);}
+function save(){localStorage.setItem("se_nick",state.nick);localStorage.setItem("se_gender",state.gender);localStorage.setItem("se_rate",state.rate);localStorage.setItem("se_key",state.key);}
 function curRate(){return RATES[state.rate]||0.7;}
 
 /* ================= 朗读（复用多链路：浏览器→百度→有道→Edge神经） ================= */
-let _canAutoplay=true,_ttsBroken=false;
+let _canAutoplay=true,_ttsBroken=false,_userGestured=false,_pendingSpeak=null;
+/* 微信/浏览器自动播放解锁：第一次触摸后才能出声；未解锁时把要读的话排队 */
+function _flushPending(){
+  if(_pendingSpeak){const fn=_pendingSpeak;_pendingSpeak=null;try{fn();}catch(e){}}
+}
+(function(){
+  const unlock=()=>{ if(_userGestured)return; _userGestured=true; _flushPending(); };
+  document.addEventListener("touchend",unlock,{once:false,passive:true});
+  document.addEventListener("click",unlock,{once:false,passive:true});
+  // 微信特殊通道：JSBridge 就绪即视为可播
+  if(/MicroMessenger/i.test(navigator.userAgent)){
+    if(window.WeixinJSBridge){ try{WeixinJSBridge.invoke("getNetworkType",{},()=>{_userGestured=true;_flushPending();});}catch(e){} }
+    else document.addEventListener("WeixinJSBridgeReady",()=>{try{WeixinJSBridge.invoke("getNetworkType",{},()=>{_userGestured=true;_flushPending();});}catch(e){}},false);
+  }
+})();
 function _canUseTTS(){ if(_ttsBroken)return false; if(!("speechSynthesis" in window))return false; if(/MicroMessenger/i.test(navigator.userAgent))return false; return true; }
+/* 屏幕顶部小提示条（替代弹窗，不打扰） */
+function notice(msg){
+  let n=$("noticeBar");
+  if(!n){n=document.createElement("div");n.id="noticeBar";n.style.cssText="position:fixed;top:0;left:0;right:0;background:#c9402a;color:#fff;font-size:15px;padding:10px 14px;z-index:999;text-align:center;";document.body.appendChild(n);}
+  n.textContent=msg;n.style.display="block";
+  clearTimeout(n._t);n._t=setTimeout(()=>{n.style.display="none";},4000);
+}
 function speak(text,rate,quiet){
   text=(text||"").trim(); if(!text)return Promise.resolve();
   const r=rate||curRate();
+  const run=()=>_speakNow(text,r,quiet);
+  if(!_userGestured&&!quiet){ _pendingSpeak=run; return Promise.resolve(); }
+  return run();
+}
+function _speakNow(text,r,quiet){
   if(_canUseTTS()){
     return new Promise((res,rej)=>{
       try{
@@ -232,6 +287,31 @@ function speak(text,rate,quiet){
   }
   return speakOnline(text,r,quiet);
 }
+/* 中文朗读（问称呼、打招呼用） */
+function speakCn(text){
+  text=(text||"").trim(); if(!text)return Promise.resolve();
+  const run=()=>{
+    if(_canUseTTS()){
+      return new Promise(res=>{
+        try{
+          speechSynthesis.cancel();
+          const u=new SpeechSynthesisUtterance(text);
+          u.lang="zh-CN";u.rate=0.95;
+          const vs=speechSynthesis.getVoices();
+          const v=vs.find(v=>/zh[-_]CN/i.test(v.lang)&&/female|xiaoxiao|huihui|ting/i.test(v.name))||vs.find(v=>/^zh/i.test(v.lang));
+          if(v)u.voice=v;
+          u.onend=()=>res();u.onerror=()=>{speakOnline(text,1,true,"zh").catch(()=>{});res();};
+          speechSynthesis.speak(u);
+          return;
+        }catch(e){}
+        speakOnline(text,1,true,"zh").catch(()=>{}).then(()=>res());
+      });
+    }
+    return speakOnline(text,1,true,"zh").catch(()=>{});
+  };
+  if(!_userGestured){ _pendingSpeak=()=>{run();}; return Promise.resolve(); }
+  return run();
+}
 function _playUrl(url,rate){
   return new Promise((res,rej)=>{
     const a=new Audio();
@@ -242,17 +322,20 @@ function _playUrl(url,rate){
     setTimeout(()=>rej(new Error("timeout")),12000);
   });
 }
-function speakOnline(text,rate,quiet){
+function speakOnline(text,rate,quiet,lang){
   text=String(text).replace(/\s+/g," ").trim().slice(0,200);
-  return _playUrl("https://fanyi.baidu.com/gettts?lan=en&spd=3&source=web&text="+encodeURIComponent(text),rate)
-  .catch(()=>_playUrl("https://dict.youdao.com/dictvoice?le=en&q="+encodeURIComponent(text),rate))
-  .catch(()=>edgeTTS(text,rate).then(u=>_playUrl(u,rate)))
-  .catch(e=>{ if(!quiet)alert("语音播放失败：请点一下屏幕任意位置，再点 🔊 重试"); throw e; });
+  const lan=lang==="zh"?"zh":"en";
+  return _playUrl("https://fanyi.baidu.com/gettts?lan="+lan+"&spd=3&source=web&text="+encodeURIComponent(text),rate)
+  .catch(()=>{ if(lan==="en")return _playUrl("https://dict.youdao.com/dictvoice?le=en&q="+encodeURIComponent(text),rate); throw new Error("no zh fallback"); })
+  .catch(()=>edgeTTS(text,rate,lang==="zh"?"zh-CN-XiaoxiaoNeural":"en-US-AvaNeural").then(u=>_playUrl(u,rate)))
+  .catch(e=>{ if(!quiet)notice("语音播放失败：点一下屏幕任意位置，再点 🔊 重试"); throw e; });
 }
-function edgeTTS(text,rate){
+function edgeTTS(text,rate,voice){
   return new Promise((resolve,reject)=>{
     const TRUSTED="6A5AA1D4EAFF4E9FB37E23D68491D6F4";
     if(!window.crypto||!crypto.subtle||!window.WebSocket){reject(new Error("unsupported"));return;}
+    const V=voice||"en-US-AvaNeural";
+    const VLANG=V.indexOf("zh")===0?"zh-CN":"en-US";
     const t=(BigInt(Math.floor(Date.now()/1000))+11644473600n)*10000000n;
     const rounded=(t/3000000000n)*3000000000n;
     crypto.subtle.digest("SHA-256",new TextEncoder().encode(rounded.toString()+TRUSTED)).then(hash=>{
@@ -267,7 +350,7 @@ function edgeTTS(text,rate){
         const date=new Date().toString();
         ws.send(`X-Timestamp:${date}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`);
         const ratePct=rate&&rate<1?"-"+Math.round((1-rate)*100)+"%":"+0%";
-        const ssml=`<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><voice name='en-US-AvaNeural'><prosody rate='${ratePct}'>${text.replace(/[<>&]/g," ")}</prosody></voice></speak>`;
+        const ssml=`<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${VLANG}'><voice name='${V}'><prosody rate='${ratePct}'>${text.replace(/[<>&]/g," ")}</prosody></voice></speak>`;
         ws.send(`X-RequestId:${id}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${date}Z\r\nPath:ssml\r\n\r\n${ssml}`);
       };
       ws.onmessage=ev=>{
@@ -308,12 +391,126 @@ async function getIpaPhrase(text){
   _ipaPhraseCache[key]=r;return r;
 }
 
+/* ================= 称呼与欢迎流程 ================= */
+function genderTitle(){return state.gender==="m"?"叔叔":"阿姨";}
+function nameTitle(){return (state.nick||"")+(state.gender?genderTitle():"");}
+/* 音高判男女：对录音做自相关基频估计，中位 F0>160Hz 判女声 */
+function pitchGenderF32(chunks,sr){
+  try{
+    if(!chunks||!chunks.length)return null;
+    let total=0;for(const c of chunks)total+=c.length;
+    if(total<sr*0.5)return null;
+    const all=new Float32Array(total);let o=0;
+    for(const c of chunks){all.set(c,o);o+=c.length;}
+    const fs=[];const N=1024,HOP=Math.floor(sr/16);
+    for(let st=Math.floor(total*0.2);st+HOP+N<total&&fs.length<40;st+=HOP){
+      let e=0;for(let i=st;i<st+N;i++)e+=all[i]*all[i];
+      if(Math.sqrt(e/N)<0.02)continue; // 跳过近静音
+      let best=0,bestLag=0;
+      const minLag=Math.floor(sr/300),maxLag=Math.floor(sr/70); // 70~300Hz
+      for(let lag=minLag;lag<=maxLag;lag++){
+        let c=0,n=0;
+        for(let i=st;i<st+N-lag;i++){c+=all[i]*all[i+lag];n++;}
+        c/=n;
+        if(c>best){best=c;bestLag=lag;}
+      }
+      let nrm=0;for(let i=st;i<st+N;i++)nrm+=all[i]*all[i];
+      if(bestLag&&best>(nrm/N)*0.35)fs.push(sr/bestLag);
+    }
+    if(fs.length<4)return null;
+    fs.sort((a,b)=>a-b);
+    return fs[Math.floor(fs.length/2)]>160?"f":"m";
+  }catch(e){return null;}
+}
+/* 欢迎层逻辑 */
+function welHello(){
+  _userGestured=true;
+  speakCn("您好啊！我是您的英语老师，我叫 Anna。我应该怎么称呼您呢？请按住下面的按钮，告诉我您姓什么。比如：我姓李。");
+  $("welStep2").classList.remove("hidden");
+  $("welResult").textContent="";
+}
+/* 欢迎层按住说话（中文） */
+let _welHolding=false;
+function welMicDown(){
+  if(_welHolding)return;_welHolding=true;
+  $("welMic").classList.add("holding");$("welMic").textContent="🔴 正在听…请说“我姓李”";
+  $("welResult").textContent="听您说呢…";
+  iatDown();
+}
+function welMicUp(){
+  if(!_welHolding)return;_welHolding=false;
+  $("welMic").classList.remove("holding");$("welMic").textContent="🎤 按住说话（说中文）";
+  const chunks=(window._iatChunks||[]).slice();
+  const sr=_iac?_iac.sampleRate:16000;
+  stopStream();
+  if(!chunks.length){$("welResult").textContent="没听到声音，再按住说一次吧 🎤";return;}
+  $("welResult").textContent="正在听懂您的话…";
+  iatRecognize(chunks,sr,"zh").then(t=>{
+    welHandleText(t);
+  }).catch(e=>{
+    $("welResult").textContent="没听清，您可以在下面手动填姓氏 👇";
+  });
+}
+function welHandleText(t){
+  t=(t||"").trim();
+  let xing="";
+  const m=t.match(/(?:我姓|姓|叫|我是|免贵姓)([\u4e00-\u9fa5a-zA-Z]{1,3})/);
+  if(m)xing=m[1].charAt(0);
+  else{const c=t.match(/[\u4e00-\u9fa5]/);if(c)xing=c[0];}
+  if(!xing){$("welResult").textContent="没听清您的姓，再按住说一次，或在下面手动填 👇";return;}
+  const g=pitchGenderF32(window._iatChunks,_iac?_iac.sampleRate:16000);
+  finishWelcome(xing,g,t);
+}
+function welManual(g){
+  const x=$("welInput").value.trim().charAt(0);
+  if(!x){alert("请先填一下您的姓氏，比如：李");return;}
+  finishWelcome(x,g,"");
+}
+function finishWelcome(xing,g,saidText){
+  if(!g)g=null;
+  state.nick=xing;state.gender=g;save();
+  $("welcomeModal").style.display="none";
+  renderHome();
+  const said=g?"":(saidText?"（听不太出您是叔叔还是阿姨，您可以在⚙️设置里改称呼）":"");
+  speakCn(`您好，${xing}${genderTitle()}！很高兴认识您！${said}接下来，我们先学今天的三句话。点句子旁边的小喇叭，跟着读就行。`);
+  toastName(xing);
+}
+function toastName(xing){
+  const t=document.createElement("div");
+  t.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;display:flex;align-items:center;justify-content:center;";
+  t.innerHTML=`<div style="background:#fff;border-radius:22px;padding:30px 26px;text-align:center;max-width:340px;">
+    <div style="font-size:46px;">🤝</div>
+    <div style="font-size:23px;font-weight:800;margin-top:8px;">认识您啦，${escapeHtml(xing)}${genderTitle()}！</div>
+    <div style="font-size:17px;color:var(--muted);margin-top:8px;">以后每次来，Anna 都会这样叫您</div>
+    <button class="mini-btn org" style="margin-top:16px;padding:12px 26px;font-size:18px;" onclick="this.parentElement.parentElement.parentElement.remove()">好嘞，开始学！</button>
+  </div>`;
+  document.body.appendChild(t);
+  setTimeout(()=>{if(t.parentElement)t.remove();},6000);
+}
+/* 欢迎页麦克风事件 */
+(function(){
+  const b=$("welMic");
+  if(!b)return;
+  b.addEventListener("touchstart",e=>{e.preventDefault();welMicDown();},{passive:false});
+  b.addEventListener("touchend",e=>{e.preventDefault();welMicUp();},{passive:false});
+  b.addEventListener("mousedown",e=>{e.preventDefault();welMicDown();});
+  b.addEventListener("mouseup",e=>{e.preventDefault();welMicUp();});
+})();
+
 /* ================= 首页渲染 ================= */
 function hashDay(){const s=todayStr();let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h;}
 function renderHome(){
   const hour=new Date().getHours();
-  const hi=state.nick?`${state.nick}，`:"";
-  $("greetLine").textContent=hour<11?`${hi}早上好！☀️ 学 3 句，2 分钟就好`:(hour<18?`${hi}下午好！☀️ 学 3 句，2 分钟就好`:`${hi}晚上好！🌙 学 3 句，2 分钟就好`);
+  const who=nameTitle();
+  const hi=who?`${who}，`:"";
+  const greet=hour<11?`${hi}早上好！☀️ 学 3 句，2 分钟就好`:(hour<18?`${hi}下午好！☀️ 学 3 句，2 分钟就好`:`${hi}晚上好！🌙 学 3 句，2 分钟就好`);
+  $("greetLine").textContent=greet;
+  // 每天第一次进入：Anna 中文语音问候（营造陪伴感）
+  const today=todayStr();
+  if(who&&localStorage.getItem("se_greeted")!==today){
+    localStorage.setItem("se_greeted",today);
+    setTimeout(()=>{ speakCn(`${who}${hour<11?"早上好":"您好"}！我是Anna，想您啦。今天还是三句话，不着急，慢慢来。`); },600);
+  }
   // 今日 3 句
   const pool=[];SCENES.forEach(s=>s.sentences.forEach(t=>pool.push({scene:s,t})));
   const h=hashDay();
@@ -636,7 +833,7 @@ function micCancel(){
   if(SR&&_rec){try{_rec.onresult=null;_rec.onend=null;_rec.stop();}catch(e){}_rec=null;}
   stopIat();_holding=false;micReset();
 }
-function iatRecognize(chunks,sr){
+function iatRecognize(chunks,sr,lang){
   return new Promise((resolve,reject)=>{
     // 合并+重采样 16k
     const total=chunks.reduce((a,c)=>a+c.length,0);
@@ -666,9 +863,10 @@ function iatRecognize(chunks,sr){
       _iatWs=ws;ws.binaryType="arraybuffer";
       const timer=setTimeout(()=>{try{ws.close();}catch(e){}reject(new Error("识别超时"));},25000);
       let text="";let sentAll=false;
+      const LANG=lang==="zh"?"zh_cn":"en_us";
       const b64e=bytes=>{let s="";const u=new Uint8Array(bytes);for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);};
       ws.onopen=()=>{
-        ws.send(JSON.stringify({common:{app_id:state.xfAppid},business:{language:"en_us",domain:"iat",accent:"mandarin",vad_eos:10000,dwa:"wpgs"},data:{status:0,format:"audio/L16;rate=16000",encoding:"raw",audio:""}}));
+        ws.send(JSON.stringify({common:{app_id:state.xfAppid},business:{language:LANG,domain:"iat",accent:"mandarin",vad_eos:10000,dwa:"wpgs"},data:{status:0,format:"audio/L16;rate=16000",encoding:"raw",audio:""}}));
         const BYTES=1280;let off=0;
         const iv=setInterval(()=>{
           if(ws.readyState!==1){clearInterval(iv);return;}
@@ -747,18 +945,24 @@ function fallbackCopy(done){
 function openSettings(){
   $("nickInput").value=state.nick;
   $("keyInput").value=state.key;
+  $("gF").classList.toggle("org",state.gender!=="m");
+  $("gM").classList.toggle("org",state.gender==="m");
   document.querySelectorAll(".rate-btn").forEach(b=>b.classList.toggle("on",b.dataset.rate===state.rate));
   $("settingsModal").style.display="flex";
 }
+function setGender(g){state.gender=g;$("gF").classList.toggle("org",g!=="m");$("gM").classList.toggle("org",g==="m");}
 function setRate(r){state.rate=r;document.querySelectorAll(".rate-btn").forEach(b=>b.classList.toggle("on",b.dataset.rate===r));save();speak("Hello! Nice to meet you!");}
 function saveSettings(){
-  state.nick=$("nickInput").value.trim().slice(0,10);
+  state.nick=$("nickInput").value.trim().charAt(0)||state.nick;
   state.key=$("keyInput").value.trim();
   save();$("settingsModal").style.display="none";renderHome();
 }
 
 /* ================= 启动 ================= */
 renderHome();
+if(!state.nick){
+  $("welcomeModal").style.display="flex";
+}
 </script>
 </body>
 </html>
